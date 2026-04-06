@@ -3,9 +3,10 @@ interface ButtonProps {
   href?: string;
   onClick?: () => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export default function Button({ children, href, onClick, className = "" }: ButtonProps) {
+export default function Button({ children, href, onClick, className = "", style: styleProp }: ButtonProps) {
   const style = {
     width: "clamp(110px, 10vw, 150px)",
     height: "clamp(38px, 4vw, 50px)",
@@ -23,6 +24,7 @@ export default function Button({ children, href, onClick, className = "" }: Butt
     whiteSpace: "nowrap" as const,
     textDecoration: "none",
     flexShrink: 0,
+    ...styleProp,
   };
 
   if (href) {
