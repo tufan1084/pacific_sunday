@@ -94,7 +94,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                     alt={item.label}
                     width={20}
                     height={20}
-                    style={{ flexShrink: 0 }}
+                    style={{
+                      flexShrink: 0,
+                      filter: isActive
+                        ? "brightness(0)"
+                        : "brightness(0) invert(1)",
+                    }}
                   />
                 )}
                 <span className="flex-1">{item.label}</span>
