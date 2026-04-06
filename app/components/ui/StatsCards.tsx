@@ -6,8 +6,8 @@ interface StatItem {
 
 interface StatsCardsProps {
   stats: StatItem[];
-  cols?: number; // grid columns, default 3
-  maxWidth?: string; // e.g. "75%", "100%"
+  cols?: number;
+  maxWidth?: string;
   marginBottom?: string;
 }
 
@@ -22,12 +22,10 @@ export default function StatsCards({
       ? "grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
       : "grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4";
 
-  const maxWidthClass = maxWidth === "100%" ? "w-full" : "w-full md:max-w-[75%]";
-
   return (
     <div
-      className={`${gridClass} ${maxWidthClass}`}
-      style={{ marginTop: "30px", marginBottom }}>
+      className={gridClass}
+      style={{ marginTop: "30px", marginBottom, maxWidth: maxWidth }}>
 
       {stats.map((stat) => (
         <div
