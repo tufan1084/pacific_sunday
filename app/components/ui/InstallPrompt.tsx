@@ -70,13 +70,25 @@ export default function InstallPrompt() {
   }, []);
 
   const handleInstall = useCallback(async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setShowModal(false);
+    if (!deferredPrompt) {
+      console.log('No install prompt available');
+      alert('Installation is not available. Please use your browser\'s menu to install this app.');
+      return;
     }
-    setDeferredPrompt(null);
+    
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('Install outcome:', outcome);
+      if (outcome === "accepted") {
+        setShowModal(false);
+        sessionStorage.setItem("pwa-install-dismissed", "true");
+      }
+      setDeferredPrompt(null);
+    } catch (error) {
+      console.error('Install error:', error);
+      alert('Unable to install. Please try using your browser\'s menu.');
+    }
   }, [deferredPrompt]);
 
   const handleDismiss = useCallback(() => {
