@@ -11,8 +11,7 @@ interface TierPickListProps {
 const dividerStyle = {
   height: "1.5px",
   backgroundColor: "rgba(255,255,255,0.15)",
-  marginLeft: "-16px",
-  marginRight: "-16px",
+  margin: "0 calc(-1 * clamp(16px, 2vw, 20px))",
 };
 
 export default function TierPickList({ sections }: TierPickListProps) {
@@ -33,7 +32,7 @@ export default function TierPickList({ sections }: TierPickListProps) {
           style={{
             backgroundColor: "#13192A",
             borderRadius: "5px",
-            padding: "20px 16px",
+            padding: "clamp(16px, 2vw, 20px)",
             fontFamily: "var(--font-poppins), sans-serif",
           }}
         >

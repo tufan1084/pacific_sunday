@@ -14,7 +14,7 @@ export default function ProjectedScore({ picks, totalPoints }: ProjectedScorePro
       style={{
         backgroundColor: "#13192A",
         borderRadius: "5px",
-        padding: "16px",
+        padding: "clamp(14px, 2vw, 16px)",
         marginBottom: "24px",
         fontFamily: "var(--font-poppins), sans-serif",
       }}

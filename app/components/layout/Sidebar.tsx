@@ -43,11 +43,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         className={`
           fixed top-0 left-0 z-50 h-full bg-ps-sidebar
           flex flex-col transition-transform duration-300 ease-in-out
-          lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:z-auto lg:overflow-y-auto
+          lg:sticky lg:top-0 lg:translate-x-0 lg:z-auto lg:overflow-y-auto
           w-[275px] xl:w-[275px] lg:w-[240px] md:w-[220px]
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
-        style={{ fontFamily: "var(--font-poppins), sans-serif" }}
+        style={{ fontFamily: "var(--font-poppins), sans-serif", maxHeight: "100vh" }}
       >
         {/* Mobile sidebar header with logo + close */}
         <div className="lg:hidden flex items-center justify-between px-5" style={{ height: "clamp(60px, 8vw, 90px)", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
@@ -67,7 +67,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation — NO border-radius on items */}
-        <nav className="flex-1 overflow-y-auto space-y-1" style={{ paddingTop: "16px" }}>
+        <nav className="flex-1 overflow-y-auto space-y-1" style={{ paddingTop: "20px", paddingBottom: "20px" }}>
           {NAV_ITEMS.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 

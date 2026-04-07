@@ -6,5 +6,5 @@ interface FantasyStatsProps {
 }
 
 export default function FantasyStats({ stats }: FantasyStatsProps) {
-  return <StatsCards stats={stats} cols={3} maxWidth="75%" marginBottom="24px" />;
+  return <StatsCards stats={stats} cols={3} maxWidth="100%" marginBottom="24px" />;
 }

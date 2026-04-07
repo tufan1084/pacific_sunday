@@ -3,6 +3,7 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/app/components/layout/AppShell";
 import ServiceWorkerRegistrar from "@/app/components/ui/ServiceWorkerRegistrar";
+import InstallPrompt from "@/app/components/ui/InstallPrompt";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -45,6 +46,7 @@ export default function RootLayout({
       </head>
       <body className="h-full antialiased" style={{ fontFamily: "var(--font-poppins), sans-serif" }}>
         <ServiceWorkerRegistrar />
+        <InstallPrompt />
         <AppShell>{children}</AppShell>
       </body>
     </html>

@@ -34,7 +34,7 @@ export default function H2HHeader() {
             Challenge any owner to a weekly fantasy duel — wager points, winner takes all
           </div>
         </div>
-        <Button onClick={() => setShowModal(true)} style={{ width: "200px" }}>+ New Challenge</Button>
+        <Button onClick={() => setShowModal(true)} style={{ width: "auto", minWidth: "160px" }}>+ New Challenge</Button>
       </div>
 
       {showModal && <NewChallengeModal onClose={() => setShowModal(false)} />}

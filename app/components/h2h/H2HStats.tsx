@@ -6,5 +6,5 @@ interface H2HStatsProps {
 }
 
 export default function H2HStats({ stats }: H2HStatsProps) {
-  return <StatsCards stats={stats} cols={3} maxWidth="75%" marginBottom="24px" />;
+  return <StatsCards stats={stats} cols={3} maxWidth="100%" marginBottom="24px" />;
 }

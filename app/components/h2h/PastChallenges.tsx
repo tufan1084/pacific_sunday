@@ -8,15 +8,13 @@ interface PastChallengesProps {
 const headerDividerStyle = {
   height: "1.5px",
   backgroundColor: "rgba(255,255,255,0.15)",
-  marginLeft: "-16px",
-  marginRight: "-16px",
+  margin: "0 calc(-1 * clamp(16px, 2vw, 20px))",
 };
 
 const rowDividerStyle = {
   height: "1.5px",
   backgroundColor: "rgba(255,255,255,0.15)",
-  marginLeft: "-16px",
-  marginRight: "-16px",
+  margin: "0 calc(-1 * clamp(16px, 2vw, 20px))",
 };
 
 export default function PastChallenges({ challenges }: PastChallengesProps) {
@@ -25,7 +23,7 @@ export default function PastChallenges({ challenges }: PastChallengesProps) {
       style={{
         backgroundColor: "#13192A",
         borderRadius: "5px",
-        padding: "20px 16px",
+        padding: "clamp(16px, 2vw, 20px)",
         fontFamily: "var(--font-poppins), sans-serif",
       }}
     >
@@ -39,13 +37,13 @@ export default function PastChallenges({ challenges }: PastChallengesProps) {
       <div style={headerDividerStyle} />
 
       {/* Rows — scrollable */}
-      <div className="past-scroll" style={{ overflowY: "auto", maxHeight: "340px", marginLeft: "-16px", marginRight: "-16px", paddingLeft: "16px", paddingRight: "16px", scrollbarWidth: "thin", scrollbarColor: "#999486 #313131" }}>
+      <div className="past-scroll" style={{ overflowY: "auto", maxHeight: "340px", margin: "0 calc(-1 * clamp(16px, 2vw, 20px))", padding: "0 clamp(16px, 2vw, 20px)", scrollbarWidth: "thin", scrollbarColor: "#999486 #313131" }}>
         {challenges.map((ch, i) => (
           <div key={i}>
             {/* Desktop: 4 cols | Mobile: 2 cols */}
             <div
               className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-10"
-              style={{ alignItems: "start", paddingTop: "10px", paddingBottom: "10px" }}
+              style={{ alignItems: "center", paddingTop: "10px", paddingBottom: "10px" }}
             >
               {/* Col 1: Player info */}
               <div className="flex items-center" style={{ gap: "10px" }}>
@@ -80,7 +78,7 @@ export default function PastChallenges({ challenges }: PastChallengesProps) {
               </div>
 
               {/* Col 3: Weather */}
-              <div>
+              <div style={{ paddingLeft: "48px" }}>
                 <div style={{ color: "#E8C96A", fontWeight: 500, fontSize: "clamp(13px, 1.2vw, 16px)" }}>
                   {ch.weather}
                 </div>

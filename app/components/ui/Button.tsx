@@ -8,11 +8,13 @@ interface ButtonProps {
 
 export default function Button({ children, href, onClick, className = "", style: styleProp }: ButtonProps) {
   const style = {
-    width: "clamp(110px, 10vw, 150px)",
-    height: "clamp(38px, 4vw, 50px)",
+    minWidth: "120px",
+    width: "auto",
+    height: "44px",
+    padding: "0 clamp(20px, 3vw, 32px)",
     backgroundColor: "#E8C96A",
     color: "#060D1F",
-    fontSize: "clamp(12px, 1.1vw, 16px)",
+    fontSize: "clamp(14px, 1.5vw, 16px)",
     fontFamily: "var(--font-poppins), sans-serif",
     fontWeight: 500,
     border: "none",
