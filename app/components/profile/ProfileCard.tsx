@@ -38,7 +38,7 @@ export default function ProfileCard({ profileData }: ProfileCardProps) {
   const name = user.name || PROFILE_USER.name;
   const email = user.email || PROFILE_USER.username;
   const countryName = user.country || null;
-  const totalBags = user.totalBags !== undefined ? user.totalBags : PROFILE_USER.bags;
+  const totalBags = user.totalBags !== undefined ? user.totalBags : 0;
   
   // Get country code for flag image
   const countryCode = countryName ? getCode(countryName) : null;

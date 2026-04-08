@@ -55,7 +55,7 @@ export default function GolfPassport({ profileData }: GolfPassportProps) {
     const fetchGolfPassport = async () => {
       try {
         const response = await api.profile.getGolfPassport() as ApiResponse<{ golfPassport: GolfPassportType | null }>;
-        if (response.success && response.data?.golfPassport) {
+        if (response.success && response.data && 'golfPassport' in response.data && response.data.golfPassport) {
           const passport = response.data.golfPassport;
           setForm({
             fullName: passport.fullName || profileData?.user?.name || "",
