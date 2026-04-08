@@ -1,37 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { PROFILE_USER } from "@/app/lib/profile-data";
 import { getCode } from "country-list";
-import { api } from "@/app/services/api";
-import type { ApiResponse, GolfPassport } from "@/app/types";
 
 interface ProfileCardProps {
   profileData?: any;
+  golfPassport?: any;
 }
 
-export default function ProfileCard({ profileData }: ProfileCardProps) {
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+export default function ProfileCard({ profileData, golfPassport }: ProfileCardProps) {
+  const [photoError, setPhotoError] = useState(false);
 
-  useEffect(() => {
-    const fetchGolfPassport = async () => {
-      try {
-        const response = await api.profile.getGolfPassport() as ApiResponse<{ golfPassport: GolfPassport | null }>;
-        if (response.success && response.data?.golfPassport?.photoUrl) {
-          const photoUrl = response.data.golfPassport.photoUrl;
-          console.log('Profile photo URL:', photoUrl);
-          setProfilePhoto(photoUrl);
-        } else {
-          setProfilePhoto(null);
-        }
-      } catch (error) {
-        console.error("Failed to load profile photo", error);
-        setProfilePhoto(null);
-      }
-    };
-
-    fetchGolfPassport();
-  }, [profileData?.user?.id]);
+  const profilePhoto = (!photoError && golfPassport?.photoUrl) ? golfPassport.photoUrl : null;
 
   // Use real data from API if available, otherwise use mock data
   const user = profileData?.user || PROFILE_USER;
@@ -39,15 +20,15 @@ export default function ProfileCard({ profileData }: ProfileCardProps) {
   const email = user.email || PROFILE_USER.username;
   const countryName = user.country || null;
   const totalBags = user.totalBags !== undefined ? user.totalBags : 0;
-  
+
   // Get country code for flag image
   const countryCode = countryName ? getCode(countryName) : null;
-  
+
   // Format member since date from createdAt
-  const memberSince = user.memberSince 
+  const memberSince = user.memberSince
     ? new Date(user.memberSince).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     : PROFILE_USER.member;
-  
+
   // Generate initials from name
   const initials = name
     .split(' ')
@@ -57,10 +38,10 @@ export default function ProfileCard({ profileData }: ProfileCardProps) {
     .slice(0, 2);
 
   const badges = [
-    PROFILE_USER.rank, // Keep static for now
-    PROFILE_USER.pts,  // Keep static for now
-    PROFILE_USER.weeks, // Keep static for now
-    `${totalBags} Bags`, // Use real bag count
+    PROFILE_USER.rank,
+    PROFILE_USER.pts,
+    PROFILE_USER.weeks,
+    `${totalBags} Bags`,
   ];
 
   return (
@@ -69,12 +50,12 @@ export default function ProfileCard({ profileData }: ProfileCardProps) {
       <div className="flex items-center gap-3" style={{ marginBottom: "16px" }}>
         <div style={{ width: "50px", height: "50px", borderRadius: "3px", border: "1.5px solid #E8C96A", backgroundColor: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
           {profilePhoto ? (
-            <img 
-              src={`http://localhost:5000${profilePhoto}`} 
-              alt={name} 
+            <img
+              src={`http://localhost:5000${profilePhoto}`}
+              alt={name}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
               crossOrigin="anonymous"
-              onError={() => setProfilePhoto(null)}
+              onError={() => setPhotoError(true)}
             />
           ) : (
             <span style={{ color: "#E8C96A", fontSize: "18px", fontWeight: 600 }}>{initials}</span>

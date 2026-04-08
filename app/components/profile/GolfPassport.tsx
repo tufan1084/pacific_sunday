@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "@/app/services/api";
 import { getData } from "country-list";
-import type { ApiResponse, GolfPassport as GolfPassportType } from "@/app/types";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -29,9 +28,11 @@ const labelStyle: React.CSSProperties = {
 
 interface GolfPassportProps {
   profileData?: any;
+  golfPassport?: any;
+  onUpdate?: (passport: any) => void;
 }
 
-export default function GolfPassport({ profileData }: GolfPassportProps) {
+export default function GolfPassport({ profileData, golfPassport, onUpdate }: GolfPassportProps) {
   const [form, setForm] = useState({
     fullName: "",
     nickname: "",
@@ -42,68 +43,44 @@ export default function GolfPassport({ profileData }: GolfPassportProps) {
     golfCountry: "",
     bio: "",
   });
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const update = (key: string, val: string) => setForm(p => ({ ...p, [key]: val }));
-  
+
   const countries = getData();
 
+  // Populate form from passed golfPassport prop
   useEffect(() => {
-    const fetchGolfPassport = async () => {
-      try {
-        const response = await api.profile.getGolfPassport() as ApiResponse<{ golfPassport: GolfPassportType | null }>;
-        if (response.success && response.data && 'golfPassport' in response.data && response.data.golfPassport) {
-          const passport = response.data.golfPassport;
-          setForm({
-            fullName: passport.fullName || profileData?.user?.name || "",
-            nickname: passport.nickname || "",
-            handicap: passport.handicap || "",
-            bestScore: passport.bestScore || "",
-            yearsPlaying: passport.yearsPlaying || "",
-            homeCourse: passport.homeCourse || "",
-            golfCountry: passport.golfCountry || profileData?.user?.country || "",
-            bio: passport.bio || "",
-          });
-          if (passport.photoUrl) {
-            setPhoto(passport.photoUrl);
-            setPhotoPreview(`http://localhost:5000${passport.photoUrl}`);
-          }
-        } else {
-          // No golf passport yet, prefill with profile data
-          setForm({
-            fullName: profileData?.user?.name || "",
-            nickname: "",
-            handicap: "",
-            bestScore: "",
-            yearsPlaying: "",
-            homeCourse: "",
-            golfCountry: profileData?.user?.country || "",
-            bio: "",
-          });
-        }
-      } catch (error) {
-        console.error("Failed to load golf passport", error);
-        // Prefill with profile data on error
-        setForm({
-          fullName: profileData?.user?.name || "",
-          nickname: "",
-          handicap: "",
-          bestScore: "",
-          yearsPlaying: "",
-          homeCourse: "",
-          golfCountry: profileData?.user?.country || "",
-          bio: "",
-        });
-      } finally {
-        setLoading(false);
+    if (golfPassport) {
+      setForm({
+        fullName: golfPassport.fullName || profileData?.user?.name || "",
+        nickname: golfPassport.nickname || "",
+        handicap: golfPassport.handicap || "",
+        bestScore: golfPassport.bestScore || "",
+        yearsPlaying: golfPassport.yearsPlaying || "",
+        homeCourse: golfPassport.homeCourse || "",
+        golfCountry: golfPassport.golfCountry || profileData?.user?.country || "",
+        bio: golfPassport.bio || "",
+      });
+      if (golfPassport.photoUrl) {
+        setPhoto(golfPassport.photoUrl);
+        setPhotoPreview(`http://localhost:5000${golfPassport.photoUrl}`);
       }
-    };
-
-    fetchGolfPassport();
-  }, [profileData]);
+    } else {
+      setForm({
+        fullName: profileData?.user?.name || "",
+        nickname: "",
+        handicap: "",
+        bestScore: "",
+        yearsPlaying: "",
+        homeCourse: "",
+        golfCountry: profileData?.user?.country || "",
+        bio: "",
+      });
+    }
+  }, [golfPassport, profileData]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -114,6 +91,10 @@ export default function GolfPassport({ profileData }: GolfPassportProps) {
       });
       if (response.success) {
         alert("Golf Passport saved successfully!");
+        // Notify parent so other components update
+        if (onUpdate && response.data) {
+          onUpdate((response.data as any).golfPassport || { ...form, photoUrl: photo });
+        }
       } else {
         alert("Failed to save Golf Passport");
       }
@@ -127,18 +108,14 @@ export default function GolfPassport({ profileData }: GolfPassportProps) {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    // Show blob preview immediately
+
     const blobUrl = URL.createObjectURL(file);
     setPhotoPreview(blobUrl);
-    
+
     try {
-      // Upload to backend
       const response = await api.profile.uploadPhoto(file);
       if (response.success && response.data?.photoUrl) {
-        // Store server URL for saving to database
         setPhoto(response.data.photoUrl);
-        console.log('Photo uploaded successfully:', response.data.photoUrl);
       } else {
         alert("Failed to upload photo");
         setPhoto(null);
@@ -152,23 +129,15 @@ export default function GolfPassport({ profileData }: GolfPassportProps) {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ backgroundColor: "#13192A", borderRadius: "5px", padding: "20px", fontFamily: "var(--font-poppins), sans-serif", minHeight: "200px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "#94A3B8" }}>Loading...</p>
-      </div>
-    );
-  }
-
   return (
     <div style={{ backgroundColor: "#13192A", borderRadius: "5px", padding: "20px", fontFamily: "var(--font-poppins), sans-serif" }}>
       {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: "16px" }}>
         <span style={{ color: "#E8C96A", fontSize: "clamp(16px, 1.8vw, 20px)", fontWeight: 400 }}>Golf Passport</span>
-        <button 
+        <button
           onClick={handleSave}
           disabled={saving}
-          className="hidden sm:block" 
+          className="hidden sm:block"
           style={{ backgroundColor: "#E8C96A", color: "#060D1F", border: "none", borderRadius: "5px", padding: "8px 20px", fontSize: "14px", fontWeight: 500, fontFamily: "var(--font-poppins), sans-serif", cursor: saving ? "not-allowed" : "pointer", whiteSpace: "nowrap", opacity: saving ? 0.6 : 1 }}
         >
           {saving ? "Saving..." : "Save"}
@@ -236,7 +205,7 @@ export default function GolfPassport({ profileData }: GolfPassportProps) {
 
       {/* Save button — after form on mobile */}
       <div className="flex sm:hidden" style={{ marginTop: "16px" }}>
-        <button 
+        <button
           onClick={handleSave}
           disabled={saving}
           style={{ backgroundColor: "#E8C96A", color: "#060D1F", border: "none", borderRadius: "5px", padding: "10px 32px", fontSize: "14px", fontWeight: 500, fontFamily: "var(--font-poppins), sans-serif", cursor: saving ? "not-allowed" : "pointer", width: "100%", opacity: saving ? 0.6 : 1 }}

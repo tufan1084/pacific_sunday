@@ -32,9 +32,9 @@ export default function MyBagPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ minHeight: "400px" }}>
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E8C96A]/20 border-t-[#E8C96A] mx-auto mb-4" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100vh - 120px)" }}>
+        <div style={{ textAlign: "center" }}>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E8C96A]/20 border-t-[#E8C96A]" style={{ margin: "0 auto 16px" }} />
           <p style={{ color: "#94A3B8", fontFamily: "var(--font-poppins), sans-serif" }}>Loading bags...</p>
         </div>
       </div>

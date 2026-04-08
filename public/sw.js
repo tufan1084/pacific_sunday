@@ -1,4 +1,4 @@
-const CACHE_NAME = "pacific-sunday-v2";
+const CACHE_NAME = "pacific-sunday-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -32,9 +32,10 @@ self.addEventListener("activate", (event) => {
 
 // Fetch: network-first with cache fallback
 self.addEventListener("fetch", (event) => {
-  // Skip non-GET requests and API calls
+  // Skip non-GET requests, API calls, and cross-origin requests
   if (event.request.method !== "GET") return;
   if (event.request.url.includes("/api/")) return;
+  if (!event.request.url.startsWith(self.location.origin)) return;
 
   // Navigation requests: network-first with offline fallback
   if (event.request.mode === "navigate") {

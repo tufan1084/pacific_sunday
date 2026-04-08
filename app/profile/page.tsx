@@ -10,17 +10,26 @@ import ProfileActions from "@/app/components/profile/ProfileActions";
 
 export default function ProfilePage() {
   const [profileData, setProfileData] = useState<any>(null);
+  const [golfPassport, setGolfPassport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchAll = async () => {
       try {
-        const response = await api.profile.get();
-        if (response.success) {
-          setProfileData(response.data);
+        const [profileRes, passportRes] = await Promise.all([
+          api.profile.get(),
+          api.profile.getGolfPassport(),
+        ]);
+
+        if (profileRes.success) {
+          setProfileData(profileRes.data);
         } else {
-          setError(response.message || "Failed to load profile");
+          setError(profileRes.message || "Failed to load profile");
+        }
+
+        if (passportRes.success && (passportRes.data as any)?.golfPassport) {
+          setGolfPassport((passportRes.data as any).golfPassport);
         }
       } catch (err) {
         setError("Could not connect to server");
@@ -29,14 +38,14 @@ export default function ProfilePage() {
       }
     };
 
-    fetchProfile();
+    fetchAll();
   }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ minHeight: "400px" }}>
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E8C96A]/20 border-t-[#E8C96A] mx-auto mb-4" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100vh - 120px)" }}>
+        <div style={{ textAlign: "center" }}>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E8C96A]/20 border-t-[#E8C96A]" style={{ margin: "0 auto 16px" }} />
           <p style={{ color: "#94A3B8", fontFamily: "var(--font-poppins), sans-serif" }}>Loading profile...</p>
         </div>
       </div>
@@ -45,7 +54,7 @@ export default function ProfilePage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center" style={{ minHeight: "400px" }}>
+      <div className="flex items-center justify-center" style={{ height: "calc(100vh - 120px)" }}>
         <div className="text-center">
           <p style={{ color: "#EF4444", fontFamily: "var(--font-poppins), sans-serif" }}>{error}</p>
         </div>
@@ -65,13 +74,13 @@ export default function ProfilePage() {
 
         {/* Left - Profile card + Golf Passport */}
         <div className="flex flex-col gap-4">
-          <ProfileCard profileData={profileData} />
-          <GolfPassport profileData={profileData} />
+          <ProfileCard profileData={profileData} golfPassport={golfPassport} />
+          <GolfPassport profileData={profileData} golfPassport={golfPassport} onUpdate={setGolfPassport} />
         </div>
 
         {/* Right - Golf Stats + Points History + Actions - stretches to match left */}
         <div className="flex flex-col gap-4">
-          <YourGolfStats />
+          <YourGolfStats golfPassport={golfPassport} />
           <div style={{ flex: 1 }}>
             <PointsHistory />
           </div>
