@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/app/services/api";
 import { GOLF_STATS } from "@/app/lib/profile-data";
+import type { ApiResponse, GolfPassport } from "@/app/types";
 
 const goldenFilter = "brightness(0) saturate(100%) invert(83%) sepia(43%) saturate(500%) hue-rotate(358deg) brightness(98%)";
 
@@ -20,7 +21,7 @@ export default function YourGolfStats() {
   useEffect(() => {
     const fetchGolfPassport = async () => {
       try {
-        const response = await api.profile.getGolfPassport();
+        const response = await api.profile.getGolfPassport() as ApiResponse<{ golfPassport: GolfPassport | null }>;
         if (response.success && response.data?.golfPassport) {
           setGolfData(response.data.golfPassport);
         }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PROFILE_USER } from "@/app/lib/profile-data";
 import { getCode } from "country-list";
 import { api } from "@/app/services/api";
+import type { ApiResponse, GolfPassport } from "@/app/types";
 
 interface ProfileCardProps {
   profileData?: any;
@@ -15,7 +16,7 @@ export default function ProfileCard({ profileData }: ProfileCardProps) {
   useEffect(() => {
     const fetchGolfPassport = async () => {
       try {
-        const response = await api.profile.getGolfPassport();
+        const response = await api.profile.getGolfPassport() as ApiResponse<{ golfPassport: GolfPassport | null }>;
         if (response.success && response.data?.golfPassport?.photoUrl) {
           const photoUrl = response.data.golfPassport.photoUrl;
           console.log('Profile photo URL:', photoUrl);

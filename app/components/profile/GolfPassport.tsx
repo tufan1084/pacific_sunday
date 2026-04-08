@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "@/app/services/api";
 import { getData } from "country-list";
+import type { ApiResponse, GolfPassport as GolfPassportType } from "@/app/types";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -53,7 +54,7 @@ export default function GolfPassport({ profileData }: GolfPassportProps) {
   useEffect(() => {
     const fetchGolfPassport = async () => {
       try {
-        const response = await api.profile.getGolfPassport();
+        const response = await api.profile.getGolfPassport() as ApiResponse<{ golfPassport: GolfPassportType | null }>;
         if (response.success && response.data?.golfPassport) {
           const passport = response.data.golfPassport;
           setForm({

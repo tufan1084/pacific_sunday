@@ -89,6 +89,22 @@ export interface WeatherData {
   playingCondition: string;
 }
 
+// Golf Passport
+export interface GolfPassport {
+  id: number;
+  profileId: number;
+  fullName: string | null;
+  nickname: string | null;
+  handicap: string | null;
+  bestScore: string | null;
+  yearsPlaying: string | null;
+  homeCourse: string | null;
+  golfCountry: string | null;
+  bio: string | null;
+  photoUrl: string | null;
+  updatedAt: string;
+}
+
 // Sidebar Nav Item
 export interface NavItem {
   icon: string;
