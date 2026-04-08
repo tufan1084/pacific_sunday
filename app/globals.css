@@ -125,3 +125,65 @@ html {
   height: 0;
   width: 0;
 }
+
+/* ── NFC Entry Page (/n) ─────────────────────────────── */
+.nfc-container {
+  max-width: 440px;
+}
+
+.nfc-logo {
+  width: 140px;
+  height: auto;
+}
+
+.nfc-input {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.nfc-btn {
+  font-size: 14px;
+  padding: 12px 16px;
+}
+
+/* Small phones (< 380px) — tighter spacing */
+@media (max-width: 379px) {
+  .nfc-container {
+    max-width: 100%;
+  }
+
+  .nfc-logo {
+    width: 120px;
+  }
+
+  .nfc-input {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .nfc-btn {
+    font-size: 13px;
+    padding: 11px 14px;
+  }
+}
+
+/* Tablets & up (>= 640px) — more breathing room */
+@media (min-width: 640px) {
+  .nfc-container {
+    max-width: 460px;
+  }
+
+  .nfc-logo {
+    width: 180px;
+  }
+
+  .nfc-input {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .nfc-btn {
+    font-size: 15px;
+    padding: 14px 20px;
+  }
+}

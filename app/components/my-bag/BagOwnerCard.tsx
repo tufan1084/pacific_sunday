@@ -20,15 +20,33 @@ function StatIcon({ type }: { type: string }) {
   return null;
 }
 
-export default function BagOwnerCard() {
+interface BagOwnerCardProps {
+  bagsData?: any;
+}
+
+export default function BagOwnerCard({ bagsData }: BagOwnerCardProps) {
+  // Use real data from API if available
+  const firstBag = bagsData?.bags?.[0];
+  const team = firstBag?.model || BAG_OWNER.team;
+  const serial = firstBag?.serial || BAG_OWNER.serial;
+  const totalBags = bagsData?.bags?.length || 0;
+
+  // Update stats with real data where available
+  const stats = [
+    { ...BAG_STATS[0] }, // Keep static rank
+    { ...BAG_STATS[1] }, // Keep static register date
+    { ...BAG_STATS[2] }, // Keep static weeks
+    { icon: "star", value: totalBags.toString(), label: "Total Bags" }, // Use real bag count
+  ];
+
   return (
     <div style={{ backgroundColor: "#13192A", borderRadius: "5px", marginTop: "30px", fontFamily: "var(--font-poppins), sans-serif", overflow: "hidden" }}>
 
       {/* Owner info — horizontal layout matching design */}
       <div className="flex flex-wrap items-center gap-4" style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <div style={{ color: "#E8C96A", fontSize: "clamp(16px, 1.8vw, 20px)", fontWeight: 500 }}>{BAG_OWNER.team}</div>
-          <div style={{ color: "#FFFFFF", fontSize: "clamp(13px, 1.3vw, 16px)", fontWeight: 400 }}>{BAG_OWNER.serial}</div>
+          <div style={{ color: "#E8C96A", fontSize: "clamp(16px, 1.8vw, 20px)", fontWeight: 500 }}>{team}</div>
+          <div style={{ color: "#FFFFFF", fontSize: "clamp(13px, 1.3vw, 16px)", fontWeight: 400 }}>{serial}</div>
         </div>
         <div className="flex items-center gap-2" style={{ backgroundColor: "#E8C96A", borderRadius: "4px", padding: "6px 12px", display: "inline-flex", flexShrink: 0 }}>
           <Image src="/icons/verified.svg" alt="verified" width={18} height={18} style={{ filter: "brightness(0)", flexShrink: 0 }} />
@@ -38,7 +56,7 @@ export default function BagOwnerCard() {
 
       {/* Stats — 2 cols on mobile, 4 cols on sm+ */}
       <div className="grid grid-cols-2 sm:grid-cols-4">
-        {BAG_STATS.map((stat, i) => (
+        {stats.map((stat, i) => (
           <div
             key={i}
             style={{

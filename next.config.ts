@@ -1,6 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'flagcdn.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'hatscripts.github.io',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '5000',
+        pathname: '/uploads/**',
+      },
+    ],
+  },
   async headers() {
     return [
       {

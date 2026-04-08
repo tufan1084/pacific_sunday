@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 
@@ -8,8 +9,16 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+const AUTH_ROUTES = ["/n"];
+
 export default function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+
+  // NFC entry / auth pages render without sidebar & header
+  if (AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
