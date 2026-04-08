@@ -33,7 +33,7 @@ export default function NFCScanHistory({ bagsData }: NFCScanHistoryProps) {
       </div>
       <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.08)", marginLeft: "-24px", marginRight: "-24px" }} />
 
-      {scanHistory.map((scan, i) => (
+      {scanHistory.map((scan: { date: string; device: string }, i: number) => (
         <div key={i}>
           <div className="flex items-center justify-between" style={{ paddingTop: "14px", paddingBottom: "14px", gap: "8px" }}>
             <span style={{ color: "#FFFFFF", fontSize: "clamp(12px, 1.2vw, 14px)", fontWeight: 400 }}>{scan.date}</span>
