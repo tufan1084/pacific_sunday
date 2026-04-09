@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
         port: '5000',
         pathname: '/uploads/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'files.iyk.app',
+      },
     ],
   },
   async headers() {

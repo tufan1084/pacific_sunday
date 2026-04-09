@@ -32,12 +32,16 @@ export const api = {
   health: () => fetchApi("/health"),
 
   bag: {
-    check: (uid: string, e: string, c: string) =>
-      fetchApi(`/bag?uid=${encodeURIComponent(uid)}&e=${encodeURIComponent(e)}&c=${encodeURIComponent(c)}`),
+    check: (e: string, c?: string, d?: string) => {
+      const params = new URLSearchParams({ e });
+      if (c) params.set("c", c);
+      if (d) params.set("d", d);
+      return fetchApi(`/bag?${params.toString()}`);
+    },
   },
 
   auth: {
-    register: (body: { name: string; email: string; password: string; serial: string; model: string; country?: string }) =>
+    register: (body: { name: string; email: string; password: string; bagUid: string; country?: string }) =>
       fetchApi("/auth/register", { method: "POST", body: JSON.stringify(body) }),
 
     login: (body: { email: string; password: string }) =>
@@ -53,19 +57,19 @@ export const api = {
   profile: {
     get: () => fetchApi("/profile"),
     getBags: () => fetchApi("/profile/bags"),
-    getBagScans: (serial: string) => fetchApi(`/profile/bags/${serial}/scans`),
+    getBagScans: (bagId: number) => fetchApi(`/profile/bags/${bagId}/scans`),
     getGolfPassport: () => fetchApi("/profile/golf-passport"),
     updateGolfPassport: (data: any) => fetchApi("/profile/golf-passport", { method: "PUT", body: JSON.stringify(data) }),
     uploadPhoto: async (file: File) => {
       const formData = new FormData();
       formData.append('photo', file);
-      
+
       const token = typeof window !== "undefined" ? localStorage.getItem("ps_token") : null;
       const headers: HeadersInit = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      
+
       const response = await fetch(`${API_BASE_URL}/profile/upload-photo`, {
         method: "POST",
         headers,

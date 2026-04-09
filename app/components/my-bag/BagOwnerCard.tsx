@@ -25,18 +25,21 @@ interface BagOwnerCardProps {
 }
 
 export default function BagOwnerCard({ bagsData }: BagOwnerCardProps) {
-  // Use real data from API if available
   const firstBag = bagsData?.bags?.[0];
-  const team = firstBag?.model || BAG_OWNER.team;
-  const serial = firstBag?.serial || BAG_OWNER.serial;
+  const bagName = firstBag?.bagType?.name || BAG_OWNER.team;
+  const uid = firstBag?.uid || BAG_OWNER.serial;
   const totalBags = bagsData?.bags?.length || 0;
+  const tapCount = firstBag?.tapCount || 0;
 
-  // Update stats with real data where available
+  const registeredDate = firstBag?.registeredAt
+    ? new Date(firstBag.registeredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : BAG_STATS[2].value;
+
   const stats = [
-    { ...BAG_STATS[0] }, // Keep static rank
-    { ...BAG_STATS[1] }, // Keep static register date
-    { ...BAG_STATS[2] }, // Keep static weeks
-    { icon: "star", value: totalBags.toString(), label: "Total Bags" }, // Use real bag count
+    { icon: "star", value: "0", label: "Points" },
+    { icon: "rank", value: tapCount.toString(), label: "Taps" },
+    { icon: "register", value: registeredDate, label: "Registered" },
+    { icon: "weeks", value: totalBags.toString(), label: "Total Bags" },
   ];
 
   return (
@@ -45,8 +48,8 @@ export default function BagOwnerCard({ bagsData }: BagOwnerCardProps) {
       {/* Owner info — horizontal layout matching design */}
       <div className="flex flex-wrap items-center gap-4" style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <div style={{ color: "#E8C96A", fontSize: "clamp(16px, 1.8vw, 20px)", fontWeight: 500 }}>{team}</div>
-          <div style={{ color: "#FFFFFF", fontSize: "clamp(13px, 1.3vw, 16px)", fontWeight: 400 }}>{serial}</div>
+          <div style={{ color: "#E8C96A", fontSize: "clamp(16px, 1.8vw, 20px)", fontWeight: 500 }}>{bagName}</div>
+          <div style={{ color: "#FFFFFF", fontSize: "clamp(13px, 1.3vw, 16px)", fontWeight: 400 }}>{uid}</div>
         </div>
         <div className="flex items-center gap-2" style={{ backgroundColor: "#E8C96A", borderRadius: "4px", padding: "6px 12px", display: "inline-flex", flexShrink: 0 }}>
           <Image src="/icons/verified.svg" alt="verified" width={18} height={18} style={{ filter: "brightness(0)", flexShrink: 0 }} />

@@ -8,24 +8,28 @@ interface BagDetailsProps {
 }
 
 export default function BagDetails({ bagsData }: BagDetailsProps) {
-  // Use real data from API if available
   const firstBag = bagsData?.bags?.[0];
-  const model = firstBag?.model || BAG_DETAILS[0].value;
-  const serial = firstBag?.serial || BAG_DETAILS[1].value;
-  
-  // Format created date if available
-  const registeredDate = firstBag?.createdAt 
-    ? new Date(firstBag.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : BAG_DETAILS[2].value;
+  const bagName = firstBag?.bagType?.name || BAG_DETAILS[0].value;
+  const uid = firstBag?.uid || BAG_DETAILS[1].value;
+  const collection = firstBag?.bagType?.collection || "—";
 
-  // Update details with real data where available
+  const registeredDate = firstBag?.registeredAt
+    ? new Date(firstBag.registeredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : firstBag?.createdAt
+    ? new Date(firstBag.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : "—";
+
+  const lastTapped = firstBag?.lastTappedAt
+    ? new Date(firstBag.lastTappedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : "Never";
+
   const details = [
-    { label: "Model", value: model, color: "#E8C96A" },
-    { label: "Serial Number", value: serial, color: "#FFFFFF" },
+    { label: "Model", value: bagName, color: "#E8C96A" },
+    { label: "UID", value: uid, color: "#FFFFFF" },
+    { label: "Collection", value: collection, color: "#FFFFFF" },
     { label: "Registered", value: registeredDate, color: "#FFFFFF" },
-    { ...BAG_DETAILS[3] }, // Keep static status
-    { ...BAG_DETAILS[4] }, // Keep static warranty
-    { ...BAG_DETAILS[5] }, // Keep static location
+    { label: "Status", value: "Active", color: "#4ADE80" },
+    { label: "Last Tapped", value: lastTapped, color: "#FFFFFF" },
   ];
 
   return (
@@ -33,7 +37,7 @@ export default function BagDetails({ bagsData }: BagDetailsProps) {
       <div className="flex flex-col sm:flex-row gap-6" style={{ alignItems: "flex-start" }}>
         {/* Bag image */}
         <div style={{ flexShrink: 0, width: "100%", maxWidth: "300px", borderRadius: "5px", overflow: "hidden", margin: "0 auto" }}>
-          <Image src="/Rectangle 21.png" alt="Golf Bag" width={300} height={400} style={{ width: "100%", height: "auto", display: "block", borderRadius: "5px" }} />
+          <Image src={firstBag?.bagType?.imageUrl || "/Rectangle 21.png"} alt={bagName} width={300} height={400} style={{ width: "100%", height: "auto", display: "block", borderRadius: "5px" }} />
         </div>
 
         {/* Details */}

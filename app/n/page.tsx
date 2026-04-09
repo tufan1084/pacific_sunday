@@ -7,11 +7,19 @@ import { api } from "@/app/services/api";
 import { useAuth } from "@/app/context/AuthContext";
 import { getData } from "country-list";
 
+interface BagInfo {
+  uid: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  collection: string | null;
+}
+
 type FlowState =
   | { step: "loading" }
   | { step: "error"; message: string }
-  | { step: "register"; model: string; serial: string }
-  | { step: "login"; serial: string }
+  | { step: "register"; bag: BagInfo }
+  | { step: "login"; bag: BagInfo }
   | { step: "submitting" };
 
 /* ── Reusable input style ─────────────────────────────── */
@@ -21,13 +29,12 @@ const inputClass =
 export default function NFCEntryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ uid?: string; e?: string; c?: string; dev?: string }>;
+  searchParams: Promise<{ e?: string; c?: string; d?: string }>;
 }) {
-  const { uid, e, c, dev } = use(searchParams);
+  const { e, c, d } = use(searchParams);
   const router = useRouter();
   const { login, register } = useAuth();
 
-  // Get all countries from package
   const countries = getData();
 
   const [flow, setFlow] = useState<FlowState>({ step: "loading" });
@@ -59,45 +66,12 @@ export default function NFCEntryPage({
   // Password strength
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, text: "", color: "" });
 
-  // Keep register data when returning from submitting state
-  const [savedRegister, setSavedRegister] = useState<{ model: string; serial: string } | null>(null);
-  const [savedLoginSerial, setSavedLoginSerial] = useState("");
+  // Keep bag data when returning from submitting state
+  const [savedBag, setSavedBag] = useState<BagInfo | null>(null);
 
   useEffect(() => {
-    // Dev mode - redirect to NFC page with mock data
-    if (process.env.NEXT_PUBLIC_DEV_MODE === "true" && !uid && !e && !c && !dev) {
-      const mockUid = process.env.NEXT_PUBLIC_MOCK_UID || "ABC123DEF456";
-      const mockE = process.env.NEXT_PUBLIC_MOCK_E || "mock_encrypted_data";
-      const mockC = process.env.NEXT_PUBLIC_MOCK_C || "mock_checksum";
-      
-      // Redirect to NFC page with mock parameters
-      router.push(`/n?uid=${mockUid}&e=${mockE}&c=${mockC}`);
-      return;
-    }
-
-    // Dev-only test mode — skip IYK validation and show forms directly
-    if (process.env.NODE_ENV === "development" && dev) {
-      if (dev === "register") {
-        const mockModel = "Pro Driver";
-        const mockSerial = "GB0001";
-        setSavedRegister({ model: mockModel, serial: mockSerial });
-        setFlow({ step: "register", model: mockModel, serial: mockSerial });
-        return;
-      }
-      if (dev === "login") {
-        const mockSerial = "GB0001";
-        setSavedLoginSerial(mockSerial);
-        setFlow({ step: "login", serial: mockSerial });
-        return;
-      }
-      if (dev === "error") {
-        setFlow({ step: "error", message: "Simulated NFC validation error for testing." });
-        return;
-      }
-    }
-
-    if (!uid || !e || !c) {
-      setFlow({ step: "error", message: "Invalid NFC tap. Missing parameters (uid, e, c)." });
+    if (!e) {
+      setFlow({ step: "error", message: "Invalid NFC tap. Missing parameters." });
       return;
     }
 
@@ -105,7 +79,7 @@ export default function NFCEntryPage({
 
     async function checkBag() {
       try {
-        const res = await api.bag.check(uid!, e!, c!);
+        const res = await api.bag.check(e!, c, d);
         if (cancelled) return;
 
         if (!res.success) {
@@ -113,14 +87,14 @@ export default function NFCEntryPage({
           return;
         }
 
-        const data = res.data as { status: string; model?: string; serial: string };
+        const data = res.data as { status: string; bag: BagInfo };
+        const bag = data.bag;
+        setSavedBag(bag);
 
         if (data.status === "new_user") {
-          setSavedRegister({ model: data.model || "", serial: data.serial });
-          setFlow({ step: "register", model: data.model || "", serial: data.serial });
+          setFlow({ step: "register", bag });
         } else if (data.status === "existing_user") {
-          setSavedLoginSerial(data.serial);
-          setFlow({ step: "login", serial: data.serial });
+          setFlow({ step: "login", bag });
         } else {
           setFlow({ step: "error", message: "Unexpected response from server." });
         }
@@ -133,7 +107,7 @@ export default function NFCEntryPage({
 
     checkBag();
     return () => { cancelled = true; };
-  }, [uid, e, c, dev, router]);
+  }, [e, c, d]);
 
   // Validation functions
   const validateName = (value: string) => {
@@ -176,25 +150,19 @@ export default function NFCEntryPage({
 
   // Input sanitization functions
   const sanitizeName = (value: string) => {
-    // Only allow letters, spaces, hyphens, and apostrophes
     let sanitized = value.replace(/[^a-zA-Z\s'-]/g, '');
-    // Prevent leading spaces
     if (sanitized.length === 1 && sanitized === ' ') return '';
     return sanitized;
   };
 
   const sanitizeEmail = (value: string) => {
-    // Only allow letters, numbers, @, ., -, and _
     let sanitized = value.replace(/[^a-zA-Z0-9@._-]/g, '').toLowerCase();
-    // Prevent leading spaces or special characters - must start with letter or number
     if (sanitized.length === 1 && !/[a-z0-9]/.test(sanitized)) return '';
     return sanitized;
   };
 
   const sanitizePassword = (value: string) => {
-    // Prevent leading spaces
     if (value.length === 1 && value === ' ') return '';
-    // Remove any spaces from password
     return value.replace(/\s/g, '');
   };
 
@@ -202,7 +170,6 @@ export default function NFCEntryPage({
     ev.preventDefault();
     setFormError("");
 
-    // Validate all fields
     const nameErr = validateName(name);
     const emailErr = validateEmail(email);
     const countryErr = !country ? "Country is required" : "";
@@ -218,17 +185,16 @@ export default function NFCEntryPage({
     if (nameErr || emailErr || countryErr || passwordErr || confirmErr) return;
     if (flow.step !== "register") return;
 
-    const model = flow.model;
-    const serial = flow.serial;
+    const bagUid = flow.bag.uid;
     setFlow({ step: "submitting" });
 
-    const res = await register({ name, email, password, serial, model, country });
+    const res = await register({ name, email, password, bagUid, country });
 
     if (res.success) {
-      router.push("/");
+      router.push("/profile");
     } else {
       setFormError(res.message || "Registration failed.");
-      setFlow({ step: "register", model, serial });
+      if (savedBag) setFlow({ step: "register", bag: savedBag });
     }
   };
 
@@ -236,7 +202,6 @@ export default function NFCEntryPage({
     ev.preventDefault();
     setFormError("");
 
-    // Validate login fields
     const emailErr = validateEmail(loginEmail);
     const passwordErr = !loginPassword ? "Password is required" : "";
 
@@ -246,7 +211,6 @@ export default function NFCEntryPage({
     if (emailErr || passwordErr) return;
     if (flow.step !== "login") return;
 
-    const serial = flow.serial;
     setFlow({ step: "submitting" });
 
     const res = await login(loginEmail, loginPassword);
@@ -255,7 +219,7 @@ export default function NFCEntryPage({
       router.push("/");
     } else {
       setFormError(res.message || "Invalid email or password.");
-      setFlow({ step: "login", serial });
+      if (savedBag) setFlow({ step: "login", bag: savedBag });
     }
   };
 
@@ -284,6 +248,26 @@ export default function NFCEntryPage({
       <path d="M12.91 4.1a16.07 16.07 0 010 15.8" />
       <path d="M16.37 2a20.4 20.4 0 010 20" />
     </svg>
+  );
+
+  /* ── Bag Card (shown in register & login) ─────────── */
+  const BagCard = ({ bag }: { bag: BagInfo }) => (
+    <div className="flex items-center gap-4 rounded-lg" style={{ backgroundColor: "rgba(232, 201, 106, 0.05)", border: "1px solid rgba(232, 201, 106, 0.1)", padding: "14px 16px", marginBottom: "20px" }}>
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg" style={{ border: "1px solid rgba(255,255,255,0.08)", backgroundColor: "#0b1326" }}>
+        {bag.imageUrl ? (
+          <img src={bag.imageUrl} alt={bag.name} className="h-full w-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[10px] text-white/40">No img</div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-semibold text-[#E8C96A]" style={{ fontSize: "clamp(13px, 1.5vw, 15px)", fontFamily: "var(--font-poppins), sans-serif" }}>{bag.name}</div>
+        {bag.collection && (
+          <div className="truncate text-white/50" style={{ fontSize: "clamp(11px, 1.2vw, 13px)", fontFamily: "var(--font-poppins), sans-serif" }}>{bag.collection}</div>
+        )}
+        <div className="truncate font-mono text-white/30" style={{ fontSize: "10px" }}>{bag.uid}</div>
+      </div>
+    </div>
   );
 
   return (
@@ -326,7 +310,6 @@ export default function NFCEntryPage({
         {/* ── Error State ── */}
         {flow.step === "error" && (
           <div className="nfc-card overflow-hidden rounded-lg" style={{ backgroundColor: "#13192A" }}>
-            {/* Header */}
             <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)", padding: "20px 24px" }}>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "rgba(239, 68, 68, 0.1)" }}>
@@ -344,7 +327,6 @@ export default function NFCEntryPage({
               </div>
             </div>
 
-            {/* Content */}
             <div style={{ padding: "24px" }}>
               <div className="rounded-md" style={{ backgroundColor: "rgba(239, 68, 68, 0.05)", padding: "16px", border: "1px solid rgba(239, 68, 68, 0.1)", marginBottom: "20px" }}>
                 <p className="text-[#F87171]" style={{ fontSize: "clamp(13px, 1.5vw, 15px)", fontFamily: "var(--font-poppins), sans-serif", lineHeight: "1.6" }}>
@@ -375,7 +357,6 @@ export default function NFCEntryPage({
         {/* ── Register Form ── */}
         {flow.step === "register" && (
           <div className="nfc-card overflow-hidden rounded-lg" style={{ backgroundColor: "#13192A" }}>
-            {/* Header */}
             <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)", padding: "20px 24px" }}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -385,7 +366,7 @@ export default function NFCEntryPage({
                   <div>
                     <h2 className="font-semibold text-white" style={{ fontSize: "clamp(16px, 2vw, 20px)", fontFamily: "var(--font-poppins), sans-serif" }}>Create Your Account</h2>
                     <p className="mt-0.5 text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif" }}>
-                      Serial: {flow.serial}
+                      Register to link your bag
                     </p>
                   </div>
                 </div>
@@ -393,8 +374,10 @@ export default function NFCEntryPage({
               </div>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleRegister} style={{ padding: "24px" }}>
+              {/* Bag details card */}
+              <BagCard bag={flow.bag} />
+
               {formError && (
                 <div className="flex items-start gap-2 rounded-md bg-red-500/10" style={{ padding: "12px", marginBottom: "20px" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round" className="mt-0.5 shrink-0">
@@ -526,7 +509,6 @@ export default function NFCEntryPage({
         {/* ── Login Form ── */}
         {flow.step === "login" && (
           <div className="nfc-card overflow-hidden rounded-lg" style={{ backgroundColor: "#13192A" }}>
-            {/* Header */}
             <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)", padding: "20px 24px" }}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -536,7 +518,7 @@ export default function NFCEntryPage({
                   <div>
                     <h2 className="font-semibold text-white" style={{ fontSize: "clamp(16px, 2vw, 20px)", fontFamily: "var(--font-poppins), sans-serif" }}>Welcome Back</h2>
                     <p className="mt-0.5 text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif" }}>
-                      Serial: {flow.serial}
+                      Log in to access your account
                     </p>
                   </div>
                 </div>
@@ -544,8 +526,10 @@ export default function NFCEntryPage({
               </div>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleLogin} style={{ padding: "24px" }}>
+              {/* Bag details card */}
+              <BagCard bag={flow.bag} />
+
               {formError && (
                 <div className="flex items-start gap-2 rounded-md bg-red-500/10" style={{ padding: "12px", marginBottom: "20px" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round" className="mt-0.5 shrink-0">

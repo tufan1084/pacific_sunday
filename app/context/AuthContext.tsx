@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
-  register: (body: { name: string; email: string; password: string; serial: string; model: string; country?: string }) => Promise<{ success: boolean; message: string }>;
+  register: (body: { name: string; email: string; password: string; bagUid: string; country?: string }) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
 }
 
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: res.success, message: res.message };
   };
 
-  const register = async (body: { name: string; email: string; password: string; serial: string; model: string; country?: string }) => {
+  const register = async (body: { name: string; email: string; password: string; bagUid: string; country?: string }) => {
     const res = await api.auth.register(body);
     if (res.success && res.data) {
       const data = res.data as { token: string; user: User };
