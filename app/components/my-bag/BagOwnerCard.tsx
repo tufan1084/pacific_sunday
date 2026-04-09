@@ -68,8 +68,7 @@ export default function BagOwnerCard({ bagsData }: BagOwnerCardProps) {
               alignItems: "center",
               justifyContent: "center",
               gap: "10px",
-              borderRight: (i === 0 || i === 2) ? "1px solid rgba(255,255,255,0.12)" : "none",
-              borderBottom: i < 2 ? "1px solid rgba(255,255,255,0.12)" : "none",
+              borderRight: i < 3 ? "1px solid rgba(255,255,255,0.12)" : "none",
             }}
           >
             <StatIcon type={stat.icon} />

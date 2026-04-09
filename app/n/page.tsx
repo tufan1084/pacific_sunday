@@ -287,23 +287,27 @@ export default function NFCEntryPage({
 
         {/* ── Loading State ── */}
         {flow.step === "loading" && (
-          <div className="nfc-card rounded-lg text-center" style={{ backgroundColor: "#13192A", padding: "50px 30px" }}>
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: "rgba(232, 201, 106, 0.1)" }}>
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E8C96A]/20 border-t-[#E8C96A]" />
+          <div style={{ minHeight: "calc(100vh - 200px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <div className="nfc-card rounded-lg" style={{ backgroundColor: "#13192A", padding: "50px 30px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{ width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "rgba(232, 201, 106, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
+                <div className="animate-spin" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "2px solid rgba(232, 201, 106, 0.2)", borderTopColor: "#E8C96A" }} />
+              </div>
+              <h2 style={{ fontSize: "clamp(16px, 2vw, 20px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 600, color: "#FFFFFF", marginBottom: "12px" }}>Verifying NFC Tap</h2>
+              <p style={{ fontSize: "clamp(13px, 1.5vw, 15px)", fontFamily: "var(--font-poppins), sans-serif", color: "#94A3B8" }}>Authenticating your bag with the server...</p>
             </div>
-            <h2 className="mb-3 font-semibold text-white" style={{ fontSize: "clamp(16px, 2vw, 20px)", fontFamily: "var(--font-poppins), sans-serif" }}>Verifying NFC Tap</h2>
-            <p className="text-[#94A3B8]" style={{ fontSize: "clamp(13px, 1.5vw, 15px)", fontFamily: "var(--font-poppins), sans-serif" }}>Authenticating your bag with the server...</p>
           </div>
         )}
 
         {/* ── Submitting State ── */}
         {flow.step === "submitting" && (
-          <div className="nfc-card rounded-lg text-center" style={{ backgroundColor: "#13192A", padding: "50px 30px" }}>
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: "rgba(232, 201, 106, 0.1)" }}>
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#E8C96A]/20 border-t-[#E8C96A]" />
+          <div style={{ minHeight: "calc(100vh - 200px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <div className="nfc-card rounded-lg" style={{ backgroundColor: "#13192A", padding: "50px 30px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{ width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "rgba(232, 201, 106, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
+                <div className="animate-spin" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "2px solid rgba(232, 201, 106, 0.2)", borderTopColor: "#E8C96A" }} />
+              </div>
+              <h2 style={{ fontSize: "clamp(16px, 2vw, 20px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 600, color: "#FFFFFF", marginBottom: "12px" }}>Processing</h2>
+              <p style={{ fontSize: "clamp(13px, 1.5vw, 15px)", fontFamily: "var(--font-poppins), sans-serif", color: "#94A3B8" }}>Setting up your account...</p>
             </div>
-            <h2 className="mb-3 font-semibold text-white" style={{ fontSize: "clamp(16px, 2vw, 20px)", fontFamily: "var(--font-poppins), sans-serif" }}>Processing</h2>
-            <p className="text-[#94A3B8]" style={{ fontSize: "clamp(13px, 1.5vw, 15px)", fontFamily: "var(--font-poppins), sans-serif" }}>Setting up your account...</p>
           </div>
         )}
 

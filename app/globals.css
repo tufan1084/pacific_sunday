@@ -129,6 +129,7 @@ html {
 /* ── NFC Entry Page (/n) ─────────────────────────────── */
 .nfc-container {
   max-width: 440px;
+  margin: 0 auto;
 }
 
 .nfc-logo {
