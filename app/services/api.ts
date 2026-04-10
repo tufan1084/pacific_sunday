@@ -15,8 +15,12 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<Api
 
   const response = await fetch(url, { ...options, headers });
 
-  // Auto-logout on 401/403 (token expired, invalid, or access denied)
-  if (response.status === 401 || response.status === 403) {
+  // Endpoints where a 401 is a legitimate "bad credentials" response, NOT an expired session.
+  // For these, pass the error through instead of auto-logging out.
+  const isAuthAttempt = endpoint.startsWith("/auth/login") || endpoint.startsWith("/auth/register");
+
+  // Auto-logout on 401/403 only if the user already had a token (actual session expiry)
+  if ((response.status === 401 || response.status === 403) && !isAuthAttempt && token) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("ps_token");
       window.location.href = "/login";
@@ -24,7 +28,10 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<Api
     return { success: false, message: "Session expired. Please login again." } as ApiResponse<T>;
   }
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({
+    success: false,
+    message: `Request failed with status ${response.status}`,
+  }));
   return data as ApiResponse<T>;
 }
 

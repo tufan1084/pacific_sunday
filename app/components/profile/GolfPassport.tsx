@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "@/app/services/api";
 import { getData } from "country-list";
+import { useToast } from "@/app/context/ToastContext";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -29,10 +30,11 @@ const labelStyle: React.CSSProperties = {
 interface GolfPassportProps {
   profileData?: any;
   golfPassport?: any;
-  onUpdate?: (passport: any) => void;
+  onUpdate?: () => void;
 }
 
 export default function GolfPassport({ profileData, golfPassport, onUpdate }: GolfPassportProps) {
+  const { showToast } = useToast();
   const [form, setForm] = useState({
     fullName: "",
     nickname: "",
@@ -90,16 +92,15 @@ export default function GolfPassport({ profileData, golfPassport, onUpdate }: Go
         photoUrl: photo,
       });
       if (response.success) {
-        alert("Golf Passport saved successfully!");
-        // Notify parent so other components update
-        if (onUpdate && response.data) {
-          onUpdate((response.data as any).golfPassport || { ...form, photoUrl: photo });
+        showToast("Golf Passport saved successfully", "success");
+        if (onUpdate) {
+          onUpdate();
         }
       } else {
-        alert("Failed to save Golf Passport");
+        showToast(response.message || "Failed to save Golf Passport", "error");
       }
     } catch (error) {
-      alert("Error saving Golf Passport");
+      showToast("Error saving Golf Passport", "error");
     } finally {
       setSaving(false);
     }
@@ -117,13 +118,13 @@ export default function GolfPassport({ profileData, golfPassport, onUpdate }: Go
       if (response.success && response.data?.photoUrl) {
         setPhoto(response.data.photoUrl);
       } else {
-        alert("Failed to upload photo");
+        showToast("Failed to upload photo", "error");
         setPhoto(null);
         setPhotoPreview(null);
       }
     } catch (error) {
       console.error("Photo upload error:", error);
-      alert("Error uploading photo");
+      showToast("Error uploading photo", "error");
       setPhoto(null);
       setPhotoPreview(null);
     }

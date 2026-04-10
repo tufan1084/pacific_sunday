@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { api } from "@/app/services/api";
 import { useAuth } from "@/app/context/AuthContext";
+import { useToast } from "@/app/context/ToastContext";
 import { getData } from "country-list";
 
 interface BagInfo {
@@ -34,6 +35,7 @@ export default function NFCEntryPage({
   const { e, c, d } = use(searchParams);
   const router = useRouter();
   const { login, register } = useAuth();
+  const { showToast } = useToast();
 
   const countries = getData();
 
@@ -382,6 +384,42 @@ export default function NFCEntryPage({
               {/* Bag details card */}
               <BagCard bag={flow.bag} />
 
+              {/* Social sign-up (placeholders) */}
+              <div style={{ marginBottom: "20px" }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => showToast("Google sign-up coming soon", "info")}
+                    className="flex items-center justify-center gap-2 rounded-md transition-all hover:opacity-90 active:scale-[0.98]"
+                    style={{ backgroundColor: "#FFFFFF", color: "#1F1F1F", height: "44px", fontFamily: "var(--font-poppins), sans-serif", fontSize: "14px", fontWeight: 500, border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 48 48">
+                      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                      <path fill="#FF3D00" d="m6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"/>
+                      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                    </svg>
+                    Continue with Google
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => showToast("Apple sign-up coming soon", "info")}
+                    className="flex items-center justify-center gap-2 rounded-md transition-all hover:opacity-90 active:scale-[0.98]"
+                    style={{ backgroundColor: "#000000", color: "#FFFFFF", height: "44px", fontFamily: "var(--font-poppins), sans-serif", fontSize: "14px", fontWeight: 500, border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF">
+                      <path d="M17.05 20.28c-.98.95-2.05.88-3.08.38c-1.09-.5-2.08-.48-3.24 0c-1.44.62-2.2.44-3.06-.37C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8c1.18-.24 2.31-.93 3.57-.84c1.51.12 2.65.72 3.4 1.8c-3.12 1.87-2.38 5.98.48 7.13c-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25c.29 2.58-2.34 4.5-3.74 4.25z"/>
+                    </svg>
+                    Continue with Apple
+                  </button>
+                </div>
+                <div className="flex items-center" style={{ gap: "12px", marginTop: "20px" }}>
+                  <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255,255,255,0.08)" }} />
+                  <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", fontFamily: "var(--font-poppins), sans-serif" }}>or continue with email</span>
+                  <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255,255,255,0.08)" }} />
+                </div>
+              </div>
+
               {formError && (
                 <div className="flex items-start gap-2 rounded-md bg-red-500/10" style={{ padding: "12px", marginBottom: "20px" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round" className="mt-0.5 shrink-0">
@@ -391,38 +429,38 @@ export default function NFCEntryPage({
                 </div>
               )}
 
-              {/* Name */}
-              <div style={{ marginBottom: "20px" }}>
-                <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Full Name <span style={{ color: "#EF4444" }}>*</span></label>
-                <input
-                  type="text" required minLength={2} maxLength={100}
-                  value={name}
-                  onChange={(ev) => {
-                    const sanitized = sanitizeName(ev.target.value);
-                    setName(sanitized);
-                    setNameError(validateName(sanitized));
-                  }}
-                  onBlur={(ev) => setNameError(validateName(ev.target.value))}
-                  placeholder="John Doe"
-                  className={`${inputClass} nfc-input ${nameError ? 'border-red-500/50' : ''}`}
-                />
-              </div>
-
-              {/* Email */}
-              <div style={{ marginBottom: "20px" }}>
-                <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Email Address <span style={{ color: "#EF4444" }}>*</span></label>
-                <input
-                  type="email" required
-                  value={email}
-                  onChange={(ev) => {
-                    const sanitized = sanitizeEmail(ev.target.value);
-                    setEmail(sanitized);
-                    setEmailError(validateEmail(sanitized));
-                  }}
-                  onBlur={(ev) => setEmailError(validateEmail(ev.target.value))}
-                  placeholder="john@example.com"
-                  className={`${inputClass} nfc-input ${emailError ? 'border-red-500/50' : ''}`}
-                />
+              {/* Name + Email */}
+              <div className="nfc-form-row">
+                <div>
+                  <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Full Name <span style={{ color: "#EF4444" }}>*</span></label>
+                  <input
+                    type="text" required minLength={2} maxLength={100}
+                    value={name}
+                    onChange={(ev) => {
+                      const sanitized = sanitizeName(ev.target.value);
+                      setName(sanitized);
+                      setNameError(validateName(sanitized));
+                    }}
+                    onBlur={(ev) => setNameError(validateName(ev.target.value))}
+                    placeholder="John Doe"
+                    className={`${inputClass} nfc-input ${nameError ? 'border-red-500/50' : ''}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Email Address <span style={{ color: "#EF4444" }}>*</span></label>
+                  <input
+                    type="email" required
+                    value={email}
+                    onChange={(ev) => {
+                      const sanitized = sanitizeEmail(ev.target.value);
+                      setEmail(sanitized);
+                      setEmailError(validateEmail(sanitized));
+                    }}
+                    onBlur={(ev) => setEmailError(validateEmail(ev.target.value))}
+                    placeholder="john@example.com"
+                    className={`${inputClass} nfc-input ${emailError ? 'border-red-500/50' : ''}`}
+                  />
+                </div>
               </div>
 
               {/* Country */}
@@ -446,55 +484,55 @@ export default function NFCEntryPage({
                 </select>
               </div>
 
-              {/* Password */}
-              <div style={{ marginBottom: "20px" }}>
-                <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Password <span style={{ color: "#EF4444" }}>*</span></label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"} required minLength={8}
-                    value={password}
-                    onChange={(ev) => {
-                      const sanitized = sanitizePassword(ev.target.value);
-                      setPassword(sanitized);
-                      setPasswordError(validatePassword(sanitized));
-                      setPasswordStrength(calculatePasswordStrength(sanitized));
-                      if (confirmPassword) {
-                        setConfirmPasswordError(sanitized !== confirmPassword ? "Passwords do not match" : "");
-                      }
-                    }}
-                    onBlur={(ev) => setPasswordError(validatePassword(ev.target.value))}
-                    placeholder="Min 8 chars, uppercase, number, special char"
-                    className={`${inputClass} nfc-input pr-10 ${passwordError ? 'border-red-500/50' : ''}`}
-                  />
-                  <EyeToggle show={showPassword} onToggle={() => setShowPassword(!showPassword)} />
-                </div>
-                {password && !passwordError && (
-                  <div className="flex items-center gap-2" style={{ marginTop: "8px" }}>
-                    <div className="h-1 flex-1 rounded-full bg-white/10">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${(passwordStrength.score / 6) * 100}%`, backgroundColor: passwordStrength.color }} />
-                    </div>
-                    <span className="text-xs" style={{ color: passwordStrength.color, fontFamily: "var(--font-poppins), sans-serif" }}>{passwordStrength.text}</span>
+              {/* Password + Confirm Password */}
+              <div className="nfc-form-row">
+                <div>
+                  <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Password <span style={{ color: "#EF4444" }}>*</span></label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"} required minLength={8}
+                      value={password}
+                      onChange={(ev) => {
+                        const sanitized = sanitizePassword(ev.target.value);
+                        setPassword(sanitized);
+                        setPasswordError(validatePassword(sanitized));
+                        setPasswordStrength(calculatePasswordStrength(sanitized));
+                        if (confirmPassword) {
+                          setConfirmPasswordError(sanitized !== confirmPassword ? "Passwords do not match" : "");
+                        }
+                      }}
+                      onBlur={(ev) => setPasswordError(validatePassword(ev.target.value))}
+                      placeholder="Min 8 chars, uppercase, number, special char"
+                      className={`${inputClass} nfc-input pr-10 ${passwordError ? 'border-red-500/50' : ''}`}
+                    />
+                    <EyeToggle show={showPassword} onToggle={() => setShowPassword(!showPassword)} />
                   </div>
-                )}
-              </div>
-
-              {/* Confirm Password */}
-              <div style={{ marginBottom: "20px" }}>
-                <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Confirm Password <span style={{ color: "#EF4444" }}>*</span></label>
-                <div className="relative">
-                  <input
-                    type={showConfirm ? "text" : "password"} required
-                    value={confirmPassword}
-                    onChange={(ev) => {
-                      const sanitized = sanitizePassword(ev.target.value);
-                      setConfirmPassword(sanitized);
-                      setConfirmPasswordError(password !== sanitized ? "Passwords do not match" : "");
-                    }}
-                    onBlur={(ev) => setConfirmPasswordError(password !== ev.target.value ? "Passwords do not match" : "")}
-                    placeholder="Re-enter your password"
-                    className={`${inputClass} nfc-input pr-10 ${confirmPasswordError ? 'border-red-500/50' : ''}`}
-                  />
-                  <EyeToggle show={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
+                  {password && !passwordError && (
+                    <div className="flex items-center gap-2" style={{ marginTop: "8px" }}>
+                      <div className="h-1 flex-1 rounded-full bg-white/10">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${(passwordStrength.score / 6) * 100}%`, backgroundColor: passwordStrength.color }} />
+                      </div>
+                      <span className="text-xs" style={{ color: passwordStrength.color, fontFamily: "var(--font-poppins), sans-serif" }}>{passwordStrength.text}</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[#94A3B8]" style={{ fontSize: "clamp(12px, 1.3vw, 14px)", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, marginBottom: "8px" }}>Confirm Password <span style={{ color: "#EF4444" }}>*</span></label>
+                  <div className="relative">
+                    <input
+                      type={showConfirm ? "text" : "password"} required
+                      value={confirmPassword}
+                      onChange={(ev) => {
+                        const sanitized = sanitizePassword(ev.target.value);
+                        setConfirmPassword(sanitized);
+                        setConfirmPasswordError(password !== sanitized ? "Passwords do not match" : "");
+                      }}
+                      onBlur={(ev) => setConfirmPasswordError(password !== ev.target.value ? "Passwords do not match" : "")}
+                      placeholder="Re-enter your password"
+                      className={`${inputClass} nfc-input pr-10 ${confirmPasswordError ? 'border-red-500/50' : ''}`}
+                    />
+                    <EyeToggle show={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
+                  </div>
                 </div>
               </div>
 

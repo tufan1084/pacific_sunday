@@ -188,3 +188,33 @@ html {
     padding: 14px 20px;
   }
 }
+
+/* Paired form fields — single column by default */
+.nfc-form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Large screens (>= 1024px) — wider card, 2-col form */
+@media (min-width: 1024px) {
+  .nfc-container {
+    max-width: 620px;
+  }
+
+  .nfc-form-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .nfc-input {
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  .nfc-btn {
+    font-size: 14px;
+    padding: 11px 16px;
+  }
+}

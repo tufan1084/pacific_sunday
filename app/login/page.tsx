@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
-import Link from "next/link";
+import { useToast } from "@/app/context/ToastContext";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
+  const { showToast } = useToast();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,10 +20,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(form.email, form.password);
-      router.push("/");
+      const result = await login(form.email, form.password);
+      if (result.success) {
+        router.push("/");
+      } else {
+        setError(result.message || "Invalid email or password");
+      }
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      setError(err?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -75,9 +80,13 @@ export default function LoginPage() {
               </button>
             </div>
             <div style={{ textAlign: "right", marginTop: "8px" }}>
-              <Link href="/forgot-password" style={{ color: "#E8C96A", fontSize: "13px", textDecoration: "none" }}>
+              <button
+                type="button"
+                onClick={() => showToast("Forgot password coming soon", "info")}
+                style={{ color: "#E8C96A", fontSize: "13px", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}
+              >
                 Forgot Password?
-              </Link>
+              </button>
             </div>
           </div>
 

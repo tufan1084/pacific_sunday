@@ -14,30 +14,30 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [profileRes, passportRes] = await Promise.all([
-          api.profile.get(),
-          api.profile.getGolfPassport(),
-        ]);
+  const fetchAll = async () => {
+    try {
+      const [profileRes, passportRes] = await Promise.all([
+        api.profile.get(),
+        api.profile.getGolfPassport(),
+      ]);
 
-        if (profileRes.success) {
-          setProfileData(profileRes.data);
-        } else {
-          setError(profileRes.message || "Failed to load profile");
-        }
-
-        if (passportRes.success && (passportRes.data as any)?.golfPassport) {
-          setGolfPassport((passportRes.data as any).golfPassport);
-        }
-      } catch (err) {
-        setError("Could not connect to server");
-      } finally {
-        setLoading(false);
+      if (profileRes.success) {
+        setProfileData(profileRes.data);
+      } else {
+        setError(profileRes.message || "Failed to load profile");
       }
-    };
 
+      if (passportRes.success && (passportRes.data as any)?.golfPassport) {
+        setGolfPassport((passportRes.data as any).golfPassport);
+      }
+    } catch (err) {
+      setError("Could not connect to server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchAll();
   }, []);
 
@@ -75,7 +75,7 @@ export default function ProfilePage() {
         {/* Left - Profile card + Golf Passport */}
         <div className="flex flex-col gap-4">
           <ProfileCard profileData={profileData} golfPassport={golfPassport} />
-          <GolfPassport profileData={profileData} golfPassport={golfPassport} onUpdate={setGolfPassport} />
+          <GolfPassport profileData={profileData} golfPassport={golfPassport} onUpdate={fetchAll} />
         </div>
 
         {/* Right - Golf Stats + Points History + Actions - stretches to match left */}
