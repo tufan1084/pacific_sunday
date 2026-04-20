@@ -61,6 +61,25 @@ export const api = {
     get: () => fetchApi<DashboardData>("/dashboard"),
   },
 
+  golf: {
+    getTournaments: (year?: number) => {
+      const params = year ? `?year=${year}` : '';
+      return fetchApi(`/golf/tournaments${params}`);
+    },
+    getTournamentPlayers: (tournId: string, year?: number) => {
+      const params = year ? `?year=${year}` : '';
+      return fetchApi(`/golf/tournament/${tournId}/players${params}`);
+    },
+    getLeaderboard: (tournId: string, year?: number) => {
+      const params = year ? `?year=${year}` : '';
+      return fetchApi(`/golf/leaderboard/${tournId}${params}`);
+    },
+    getTournamentResults: (tournId: string, year?: number) => {
+      const params = year ? `?year=${year}` : '';
+      return fetchApi(`/golf/tournament/${tournId}/results${params}`);
+    },
+  },
+
   profile: {
     get: () => fetchApi("/profile"),
     getBags: () => fetchApi("/profile/bags"),

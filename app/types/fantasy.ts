@@ -32,3 +32,80 @@ export interface ClubBoardEntry {
   club: string;
   score: number;
 }
+
+// ─── SlashGolf API Types ─────────────────────────────────────────────────────
+
+export interface Tournament {
+  tournId: string;
+  name: string;
+  courseName: string;
+  city: string;
+  state: string;
+  country: string;
+  startDate: string;
+  endDate: string;
+  purse: string;
+  isMajor: boolean;
+  status: "completed" | "live" | "upcoming";
+}
+
+export interface TournamentList {
+  completed: Tournament[];
+  live: Tournament[];
+  upcoming: Tournament[];
+}
+
+export interface ApiPlayer {
+  playerId: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  country: string;
+  worldRank: number | null;
+  status: string;
+  tier: string;
+  position: string;
+  score: string;
+  thru: string;
+}
+
+export interface ApiTier {
+  name: string;
+  rankRange: string;
+  players: ApiPlayer[];
+}
+
+export interface TournamentPlayersData {
+  tournament: {
+    tournId: string;
+    name: string;
+    courseName: string;
+    startDate: string;
+    endDate: string;
+  };
+  tiers: ApiTier[];
+}
+
+export interface TournamentResultPlayer {
+  position: string;
+  playerId: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  country: string;
+  score: string;
+  totalStrokes: string;
+  status: string;
+  thru: string;
+  rounds: string[];
+}
+
+export interface TournamentResults {
+  tournId: string;
+  year: string;
+  name: string;
+  courseName: string;
+  status: string;
+  players: TournamentResultPlayer[];
+  savedAt: string;
+}
