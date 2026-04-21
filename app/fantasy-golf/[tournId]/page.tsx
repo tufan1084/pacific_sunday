@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import TierPlayerList from "@/app/components/fantasy/TierPlayerList";
+import LockedPicksTable from "@/app/components/fantasy/LockedPicksTable";
+import LockConfirmModal from "@/app/components/fantasy/LockConfirmModal";
 import { api } from "@/app/services/api";
-import { MOCK_TIERS, STATIC_TIER_FILES } from "@/app/lib/fantasy-data";
-import type { Tournament, ApiTier, TournamentList } from "@/app/types/fantasy";
+import { useToast } from "@/app/context/ToastContext";
+import type { Tournament, ApiTier } from "@/app/types/fantasy";
+
+// Simple in-memory cache for picks
+let picksCache: Record<string, { picks: Record<string, string | null>; submittedAt: string | null; lockedAt: string | null; timestamp: number }> = {};
+const PICKS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Cache for tournament fantasy data (tiers)
+let fantasyCache: Record<string, { tournament: Tournament; tiers: ApiTier[]; timestamp: number }> = {};
+const FANTASY_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function formatDateRange(start: string, end: string) {
   if (!start) return "";
@@ -17,6 +27,40 @@ function formatDateRange(start: string, end: string) {
   return `${sStr}–${eStr}`;
 }
 
+function formatCountdown(ms: number) {
+  if (ms <= 0) return "Locked";
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${Math.max(1, m)}m`;
+}
+
+function formatRelative(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+type FantasyData = {
+  tournament: Tournament;
+  tiers: ApiTier[];
+  leaderboard: unknown | null;
+  tiersComputedAt: string | null;
+};
+
+type PicksResponse = {
+  picks: Record<string, string | null>;
+  submittedAt: string;
+  lockedAt: string | null;
+};
+
 export default function TournamentPicksPage() {
   const params = useParams();
   const router = useRouter();
@@ -26,79 +70,199 @@ export default function TournamentPicksPage() {
   const [tiers, setTiers] = useState<ApiTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [picks, setPicks] = useState<Record<string, string | null>>({});
-  const [isLocked, setIsLocked] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [lockedAt, setLockedAt] = useState<string | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
+  const [showLockModal, setShowLockModal] = useState(false);
+  const [nextTournament, setNextTournament] = useState<Tournament | null>(null);
+  const [picksLoading, setPicksLoading] = useState(true);
 
-  // Fetch tournament info
+  // Reactive clock — ticks every 30s so the countdown stays live
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Fetch next upcoming tournament for countdown
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await api.golf.getTournaments();
-        if (!cancelled && res.success && res.data) {
-          const data = res.data as TournamentList;
-          const allTournaments = [...data.live, ...data.upcoming, ...data.completed];
-          const found = allTournaments.find((t) => t.tournId === tournId);
-          if (found) {
-            setTournament(found);
-            setIsLocked(found.status === "live" || found.status === "completed");
-          }
+        if (cancelled || !res.success || !res.data) return;
+        const data = res.data as { upcoming: Tournament[]; live: Tournament[]; completed: Tournament[] };
+        
+        // Find the next upcoming tournament (earliest start date)
+        const upcoming = data.upcoming || [];
+        if (upcoming.length > 0) {
+          const sorted = [...upcoming].sort((a, b) => {
+            const dateA = new Date(a.startDate).getTime();
+            const dateB = new Date(b.startDate).getTime();
+            return dateA - dateB;
+          });
+          setNextTournament(sorted[0]);
         }
       } catch {
-        // silently fail
+        /* silent */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Load persisted picks from DB once tournId is known
+  useEffect(() => {
+    if (!tournId) return;
+    let cancelled = false;
+    (async () => {
+      setPicksLoading(true);
+      
+      // Check cache first
+      const cached = picksCache[tournId];
+      const now = Date.now();
+      if (cached && (now - cached.timestamp) < PICKS_CACHE_DURATION) {
+        setPicks(cached.picks);
+        setSavedAt(cached.submittedAt);
+        setLockedAt(cached.lockedAt);
+        setPicksLoading(false);
+        return;
+      }
+      
+      try {
+        const res = await api.golf.getPicks(tournId);
+        if (cancelled || !res.success || !res.data) return;
+        const d = res.data as PicksResponse;
+        const picks = d.picks || {};
+        const submittedAt = d.submittedAt ?? null;
+        const lockedAt = d.lockedAt ?? null;
+        
+        setPicks(picks);
+        setSavedAt(submittedAt);
+        setLockedAt(lockedAt);
+        
+        // Update cache
+        picksCache[tournId] = { picks, submittedAt, lockedAt, timestamp: Date.now() };
+      } catch {
+        /* silent */
+      } finally {
+        if (!cancelled) setPicksLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, [tournId]);
 
-  // Fetch players/tiers
-  const fetchPlayers = useCallback(async () => {
-    setLoading(true);
-    try {
-      // 1. Check static JSON first
-      const staticFile = STATIC_TIER_FILES[tournId];
-      if (staticFile) {
-        const res = await fetch(staticFile);
-        if (res.ok) {
-          const data: ApiTier[] = await res.json();
-          if (data.length > 0) {
-            setTiers(data);
-            return;
-          }
-        }
-      }
+  const startTs = tournament?.startDate ? new Date(tournament.startDate).getTime() : 0;
+  const msRemaining = startTs ? Math.max(0, startTs - now) : 0;
+  const timeLocked = startTs > 0 && now >= startTs;
+  const statusLocked = tournament?.status === "live" || tournament?.status === "completed";
+  const userLocked = !!lockedAt;
+  const isLocked = statusLocked || timeLocked || userLocked;
 
-      // 2. Try the backend API
-      const res = await api.golf.getTournamentPlayers(tournId);
-      if (res.success && res.data) {
-        const data = res.data as { tournament: { name: string }; tiers: ApiTier[] };
-        if (data.tiers && data.tiers.length > 0) {
-          setTiers(data.tiers);
-          return;
-        }
-      }
-
-      // 3. Fallback to mock tiers for dev
-      setTiers(MOCK_TIERS);
-    } catch {
-      setTiers(MOCK_TIERS);
-    } finally {
-      setLoading(false);
-    }
-  }, [tournId]);
-
+  // Single call: tournament meta + tiers + leaderboard
   useEffect(() => {
-    fetchPlayers();
-  }, [fetchPlayers]);
+    let cancelled = false;
+    (async () => {
+      // Check cache first
+      const cached = fantasyCache[tournId];
+      const now = Date.now();
+      if (cached && (now - cached.timestamp) < FANTASY_CACHE_DURATION) {
+        setTournament(cached.tournament);
+        setTiers(cached.tiers);
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        const res = await api.golf.getTournamentFantasy(tournId);
+        if (cancelled) return;
+        if (res.success && res.data) {
+          const data = res.data as FantasyData;
+          setTournament(data.tournament);
+          setTiers(Array.isArray(data.tiers) ? data.tiers : []);
+          
+          // Update cache
+          fantasyCache[tournId] = {
+            tournament: data.tournament,
+            tiers: Array.isArray(data.tiers) ? data.tiers : [],
+            timestamp: Date.now()
+          };
+        }
+      } catch {
+        // silently fail — tiers stays empty, UI shows empty-state
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tournId]);
 
   const selectedCount = Object.values(picks).filter(Boolean).length;
   const totalPicks = 5;
 
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  const handleSave = async () => {
+    if (isLocked || selectedCount === 0 || busy) return;
+    setBusy(true);
+    try {
+      const res = await api.golf.savePicks(tournId, picks);
+      if (res.success && res.data) {
+        const d = res.data as PicksResponse;
+        setSavedAt(d.submittedAt);
+        setLockedAt(d.lockedAt ?? null);
+        toast.success(`Picks saved · ${selectedCount}/${totalPicks}`);
+      } else {
+        toast.error(res.message || "Failed to save picks");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLockClick = () => {
+    if (isLocked || selectedCount < totalPicks || busy) return;
+    setShowLockModal(true);
+  };
+
+  const handleLockConfirm = async () => {
+    setShowLockModal(false);
+    setBusy(true);
+    try {
+      const res = await api.golf.lockPicks(tournId, picks);
+      if (res.success && res.data) {
+        const d = res.data as PicksResponse;
+        setSavedAt(d.submittedAt);
+        setLockedAt(d.lockedAt ?? null);
+        toast.success("Picks locked · Good luck!");
+      } else {
+        toast.error(res.message || "Failed to lock picks");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLockCancel = () => {
+    setShowLockModal(false);
+  };
+
+  const lockReason = useMemo(() => {
+    if (statusLocked) return `Tournament is ${tournament?.status === "live" ? "live" : "completed"} · Picks are locked`;
+    if (timeLocked) return "Round 1 has started · Picks are locked";
+    if (userLocked) return `Locked ${formatRelative(lockedAt!)}`;
+    return null;
+  }, [statusLocked, timeLocked, userLocked, lockedAt, tournament?.status]);
+
   return (
     <div style={{ fontFamily: "var(--font-poppins), sans-serif" }}>
-      {/* Back + Header */}
-      <div style={{ marginBottom: "24px" }}>
+      <div style={{ marginBottom: "clamp(16px, 3vw, 24px)" }}>
         <button
-          onClick={() => router.push("/fantasy-golf")}
+          onClick={() => router.back()}
           className="flex items-center"
           style={{
             gap: "6px",
@@ -106,10 +270,10 @@ export default function TournamentPicksPage() {
             border: "none",
             color: "rgba(255,255,255,0.5)",
             cursor: "pointer",
-            fontSize: "13px",
+            fontSize: "clamp(12px, 1.5vw, 13px)",
             fontFamily: "var(--font-poppins), sans-serif",
             padding: "0",
-            marginBottom: "12px",
+            marginBottom: "clamp(8px, 2vw, 12px)",
           }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -118,42 +282,68 @@ export default function TournamentPicksPage() {
           Back to Tournaments
         </button>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div
-              className="tracking-wide"
-              style={{
-                fontSize: "clamp(18px, 2.5vw, 25px)",
-                color: "#E8C96A",
-                fontWeight: 400,
-              }}
-            >
-              Fantasy Golf — {tournament?.name || "Tournament"}
+        <div className="flex flex-col gap-3" style={{ gap: "clamp(8px, 2vw, 12px)" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div
+                className="tracking-wide"
+                style={{
+                  fontSize: "clamp(16px, 3vw, 25px)",
+                  color: "#E8C96A",
+                  fontWeight: 400,
+                }}
+              >
+                Fantasy Golf — {tournament?.name || "Tournament"}
+              </div>
+              <div
+                className="mt-1"
+                style={{
+                  fontSize: "clamp(12px, 1.8vw, 16px)",
+                  color: "#FFFFFF",
+                  fontWeight: 400,
+                }}
+              >
+                {tournament ? (
+                  <>
+                    {tournament.name} · {tournament.courseName}
+                    {tournament.startDate && ` · ${formatDateRange(tournament.startDate, tournament.endDate)}`}
+                  </>
+                ) : (
+                  "Loading tournament info..."
+                )}
+              </div>
             </div>
-            <div
-              className="mt-1"
-              style={{
-                fontSize: "clamp(13px, 1.5vw, 16px)",
-                color: "#FFFFFF",
-                fontWeight: 400,
-              }}
-            >
-              {tournament ? (
-                <>
-                  {tournament.name} · {tournament.courseName}
-                  {tournament.startDate && ` · ${formatDateRange(tournament.startDate, tournament.endDate)}`}
-                </>
-              ) : (
-                "Loading tournament info..."
+            <div className="hidden sm:flex items-center gap-4" style={{ gap: "clamp(8px, 2vw, 16px)" }}>
+              <span
+                style={{
+                  color: "#E8C96A",
+                  fontSize: "clamp(14px, 2vw, 18px)",
+                  fontWeight: 500,
+                }}
+              >
+                {selectedCount}/{totalPicks} Picks
+              </span>
+              {isLocked && (
+                <span
+                  style={{
+                    fontSize: "clamp(10px, 1.5vw, 12px)",
+                    fontWeight: 600,
+                    backgroundColor: "#FF6B6B",
+                    color: "#060D1F",
+                    padding: "clamp(3px, 0.5vw, 4px) clamp(8px, 1.5vw, 10px)",
+                    borderRadius: "5px",
+                  }}
+                >
+                  LOCKED
+                </span>
               )}
             </div>
           </div>
-
-          <div className="flex items-center gap-4" style={{ flexShrink: 0 }}>
+          <div className="flex sm:hidden items-center gap-4" style={{ gap: "clamp(8px, 2vw, 16px)" }}>
             <span
               style={{
                 color: "#E8C96A",
-                fontSize: "clamp(14px, 1.5vw, 18px)",
+                fontSize: "clamp(14px, 2vw, 18px)",
                 fontWeight: 500,
               }}
             >
@@ -162,11 +352,11 @@ export default function TournamentPicksPage() {
             {isLocked && (
               <span
                 style={{
-                  fontSize: "12px",
+                  fontSize: "clamp(10px, 1.5vw, 12px)",
                   fontWeight: 600,
                   backgroundColor: "#FF6B6B",
                   color: "#060D1F",
-                  padding: "4px 10px",
+                  padding: "clamp(3px, 0.5vw, 4px) clamp(8px, 1.5vw, 10px)",
                   borderRadius: "5px",
                 }}
               >
@@ -177,27 +367,51 @@ export default function TournamentPicksPage() {
         </div>
       </div>
 
-      {/* Tier Player List */}
-      {loading ? (
+      {loading || picksLoading ? (
         <div
           style={{
             backgroundColor: "#13192A",
             borderRadius: "5px",
             padding: "40px 20px",
             textAlign: "center",
-            color: "rgba(255,255,255,0.4)",
-            fontSize: "14px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "16px",
           }}
         >
-          Loading players...
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              border: "3px solid rgba(232,201,106,0.2)",
+              borderTop: "3px solid #E8C96A",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "14px" }}>
+            {picksLoading && !loading ? "Loading picks..." : "Loading players..."}
+          </div>
+          <style jsx>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       ) : tiers.length > 0 ? (
-        <TierPlayerList
-          tiers={tiers}
-          onPlayerSelect={isLocked ? undefined : (tierName, player) => {
-            setPicks((prev) => ({ ...prev, [tierName]: player.playerId }));
-          }}
-        />
+        isLocked || selectedCount > 0 ? (
+          <LockedPicksTable tiers={tiers} picks={picks} />
+        ) : (
+          <TierPlayerList
+            tiers={tiers}
+            selectedPicks={picks}
+            onPlayerSelect={(tierName, player) => {
+              setPicks((prev) => ({ ...prev, [tierName]: player.playerId }));
+            }}
+          />
+        )
       ) : (
         <div
           style={{
@@ -217,77 +431,113 @@ export default function TournamentPicksPage() {
         </div>
       )}
 
-      {/* Save & Lock Footer */}
-      {tiers.length > 0 && (
-        <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
-          <div style={{ display: "flex", gap: "10px" }}>
+      {tiers.length > 0 && !isLocked && !picksLoading && (
+        <div style={{ marginTop: "clamp(16px, 3vw, 20px)", display: "flex", flexDirection: "column", gap: "clamp(8px, 1.5vw, 10px)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "clamp(8px, 1.5vw, 10px)" }} className="sm:flex-row">
             <button
-              disabled={isLocked || selectedCount === 0}
+              onClick={handleSave}
+              disabled={isLocked || selectedCount === 0 || busy}
               style={{
                 flex: 1,
-                height: "clamp(44px, 4.5vw, 52px)",
+                height: "clamp(44px, 6vw, 52px)",
                 backgroundColor: isLocked || selectedCount === 0 ? "rgba(255,255,255,0.06)" : "rgba(232,201,106,0.15)",
                 color: isLocked || selectedCount === 0 ? "rgba(255,255,255,0.25)" : "#E8C96A",
-                fontSize: "14px",
+                fontSize: "clamp(13px, 1.8vw, 14px)",
                 fontWeight: 600,
                 fontFamily: "var(--font-poppins), sans-serif",
                 border: isLocked || selectedCount === 0 ? "1.5px solid rgba(255,255,255,0.08)" : "1.5px solid #E8C96A",
                 borderRadius: "5px",
-                cursor: isLocked || selectedCount === 0 ? "not-allowed" : "pointer",
+                cursor: isLocked || selectedCount === 0 || busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.6 : 1,
                 transition: "all 0.2s ease",
               }}
             >
-              Save Picks
+              {busy ? "Saving..." : savedAt && !isLocked ? "Update Picks" : "Save Picks"}
             </button>
             <button
-              disabled={isLocked || selectedCount < totalPicks}
+              onClick={handleLockClick}
+              disabled={isLocked || selectedCount < totalPicks || busy}
               style={{
                 flex: 1,
-                height: "clamp(44px, 4.5vw, 52px)",
+                height: "clamp(44px, 6vw, 52px)",
                 backgroundColor: isLocked ? "rgba(255,255,255,0.06)" : selectedCount < totalPicks ? "rgba(232,201,106,0.3)" : "#E8C96A",
                 color: isLocked ? "rgba(255,255,255,0.25)" : selectedCount < totalPicks ? "rgba(6,13,31,0.5)" : "#060D1F",
-                fontSize: "14px",
+                fontSize: "clamp(13px, 1.8vw, 14px)",
                 fontWeight: 600,
                 fontFamily: "var(--font-poppins), sans-serif",
                 border: "none",
                 borderRadius: "5px",
-                cursor: isLocked || selectedCount < totalPicks ? "not-allowed" : "pointer",
+                cursor: isLocked || selectedCount < totalPicks || busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.6 : 1,
                 transition: "all 0.2s ease",
               }}
             >
-              {isLocked ? "Picks Locked" : `Lock Picks (${selectedCount}/${totalPicks})`}
+              {busy ? "Working..." : isLocked ? "Picks Locked" : `Lock Picks (${selectedCount}/${totalPicks})`}
             </button>
           </div>
 
           {!isLocked && tournament?.startDate && (
             <div
               style={{
-                fontSize: "12px",
+                fontSize: "clamp(11px, 1.5vw, 12px)",
                 color: "rgba(255,255,255,0.4)",
                 textAlign: "center",
+                display: "flex",
+                justifyContent: "center",
+                gap: "8px",
+                flexWrap: "wrap",
               }}
             >
-              Picks lock when the tournament starts ·{" "}
-              {new Date(tournament.startDate).toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              })}
+              <span>
+                Round 1 starts in{" "}
+                <span style={{ color: "#E8C96A", fontWeight: 500 }}>{formatCountdown(msRemaining)}</span>
+              </span>
+              {savedAt && <span style={{ color: "rgba(255,255,255,0.3)" }}>· Saved {formatRelative(savedAt)}</span>}
             </div>
           )}
 
-          {isLocked && (
-            <div
-              style={{
-                fontSize: "12px",
-                color: "rgba(255,255,255,0.3)",
-                textAlign: "center",
-              }}
-            >
-              Tournament is {tournament?.status === "live" ? "live" : "completed"} · Picks are locked
+          {isLocked && lockReason && (
+            <div style={{ fontSize: "clamp(11px, 1.5vw, 12px)", color: "rgba(255,255,255,0.3)", textAlign: "center" }}>
+              {lockReason}
             </div>
           )}
+
+          {isLocked && nextTournament && nextTournament.startDate && (() => {
+            const nextStartTs = new Date(nextTournament.startDate).getTime();
+            const nextMsRemaining = Math.max(0, nextStartTs - now);
+            return nextMsRemaining > 0 ? (
+              <div
+                style={{
+                  marginTop: "clamp(8px, 2vw, 12px)",
+                  padding: "clamp(12px, 2vw, 16px)",
+                  backgroundColor: "rgba(232,201,106,0.08)",
+                  border: "1px solid rgba(232,201,106,0.2)",
+                  borderRadius: "5px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "clamp(10px, 1.5vw, 11px)", color: "rgba(255,255,255,0.5)", marginBottom: "4px" }}>
+                  Next Tournament
+                </div>
+                <div style={{ fontSize: "clamp(12px, 1.8vw, 13px)", color: "#E8C96A", fontWeight: 600, marginBottom: "4px" }}>
+                  {nextTournament.name}
+                </div>
+                <div style={{ fontSize: "clamp(11px, 1.5vw, 12px)", color: "rgba(255,255,255,0.6)" }}>
+                  Unlocks in <span style={{ color: "#E8C96A", fontWeight: 500 }}>{formatCountdown(nextMsRemaining)}</span>
+                </div>
+              </div>
+            ) : null;
+          })()}
         </div>
+      )}
+
+      {showLockModal && (
+        <LockConfirmModal
+          onConfirm={handleLockConfirm}
+          onCancel={handleLockCancel}
+          selectedCount={selectedCount}
+          totalPicks={totalPicks}
+        />
       )}
     </div>
   );

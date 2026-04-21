@@ -66,17 +66,31 @@ export const api = {
       const params = year ? `?year=${year}` : '';
       return fetchApi(`/golf/tournaments${params}`);
     },
-    getTournamentPlayers: (tournId: string, year?: number) => {
+    // Single-call endpoint: returns { tournament, tiers, leaderboard }
+    getTournamentFantasy: (tournId: string, year?: number) => {
       const params = year ? `?year=${year}` : '';
-      return fetchApi(`/golf/tournament/${tournId}/players${params}`);
+      return fetchApi(`/golf/tournament/${tournId}/fantasy${params}`);
     },
-    getLeaderboard: (tournId: string, year?: number) => {
+    // Picks — authenticated
+    getPicks: (tournId: string, year?: number) => {
       const params = year ? `?year=${year}` : '';
-      return fetchApi(`/golf/leaderboard/${tournId}${params}`);
+      return fetchApi<{ picks: Record<string, string | null>; submittedAt: string; lockedAt: string | null } | null>(
+        `/golf/tournament/${tournId}/picks${params}`
+      );
     },
-    getTournamentResults: (tournId: string, year?: number) => {
+    savePicks: (tournId: string, picks: Record<string, string | null>, year?: number) => {
       const params = year ? `?year=${year}` : '';
-      return fetchApi(`/golf/tournament/${tournId}/results${params}`);
+      return fetchApi<{ picks: Record<string, string | null>; submittedAt: string; lockedAt: string | null }>(
+        `/golf/tournament/${tournId}/picks${params}`,
+        { method: "PUT", body: JSON.stringify({ picks }) }
+      );
+    },
+    lockPicks: (tournId: string, picks: Record<string, string | null>, year?: number) => {
+      const params = year ? `?year=${year}` : '';
+      return fetchApi<{ picks: Record<string, string | null>; submittedAt: string; lockedAt: string }>(
+        `/golf/tournament/${tournId}/picks/lock${params}`,
+        { method: "POST", body: JSON.stringify({ picks }) }
+      );
     },
   },
 

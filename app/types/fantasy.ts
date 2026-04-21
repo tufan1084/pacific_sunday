@@ -47,6 +47,7 @@ export interface Tournament {
   purse: string;
   isMajor: boolean;
   status: "completed" | "live" | "upcoming";
+  fieldAvailable?: boolean;
 }
 
 export interface TournamentList {
@@ -60,13 +61,14 @@ export interface ApiPlayer {
   name: string;
   firstName: string;
   lastName: string;
-  country: string;
+  country: string | null;
   worldRank: number | null;
-  status: string;
-  tier: string;
-  position: string;
-  score: string;
-  thru: string;
+  isAmateur?: boolean;
+  status?: string;
+  tier?: string;
+  position?: string;
+  score?: string;
+  thru?: string;
 }
 
 export interface ApiTier {

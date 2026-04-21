@@ -6,6 +6,7 @@ import type { ApiTier, ApiPlayer } from "@/app/types/fantasy";
 
 interface TierPlayerListProps {
   tiers: ApiTier[];
+  selectedPicks?: Record<string, string | null>;
   onPlayerSelect?: (tier: string, player: ApiPlayer) => void;
 }
 
@@ -21,24 +22,29 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-function getCountryFlag(country: string) {
+function getCountryFlag(country: string | null | undefined) {
   if (!country || country.length !== 2) return null;
   const code = country.toUpperCase();
   const offset = 127397;
   return String.fromCodePoint(...[...code].map((c) => c.charCodeAt(0) + offset));
 }
 
-export default function TierPlayerList({ tiers, onPlayerSelect }: TierPlayerListProps) {
-  const [selected, setSelected] = useState<Record<string, string | null>>(() =>
+export default function TierPlayerList({ tiers, selectedPicks, onPlayerSelect }: TierPlayerListProps) {
+  // If `selectedPicks` is provided, component is controlled by parent; else use internal state
+  const isControlled = selectedPicks !== undefined;
+  const [internalSelected, setInternalSelected] = useState<Record<string, string | null>>(() =>
     Object.fromEntries(tiers.map((t) => [t.name, null]))
   );
+  const selected = isControlled ? selectedPicks! : internalSelected;
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(tiers.map((t) => [t.name, false]))
   );
 
   const handleSelect = (tier: ApiTier, player: ApiPlayer) => {
-    setSelected((prev) => ({ ...prev, [tier.name]: player.playerId }));
+    if (!isControlled) {
+      setInternalSelected((prev) => ({ ...prev, [tier.name]: player.playerId }));
+    }
     onPlayerSelect?.(tier.name, player);
   };
 
@@ -104,15 +110,32 @@ export default function TierPlayerList({ tiers, onPlayerSelect }: TierPlayerList
             </div>
             <div style={dividerStyle} />
 
-            {/* Player rows */}
-            {!isCollapsed &&
-              tier.players.map((player, i) => {
+            {/* Player rows — show 10, scroll the rest */}
+            {!isCollapsed && (
+              <div
+                className={playerCount > 10 ? "tier-scroll" : undefined}
+                style={
+                  playerCount > 10
+                    ? {
+                        maxHeight: "calc(10 * clamp(56px, 5vw, 68px) + 9 * 1.5px)",
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                        marginLeft: "calc(-1 * clamp(16px, 2vw, 20px))",
+                        marginRight: "calc(-1 * clamp(16px, 2vw, 20px))",
+                        paddingLeft: "clamp(16px, 2vw, 20px)",
+                        paddingRight: "clamp(16px, 2vw, 20px)",
+                      }
+                    : undefined
+                }
+              >
+                {tier.players.map((player, i) => {
                 const isSelected = selected[tier.name] === player.playerId;
                 const flag = getCountryFlag(player.country);
                 const isCut = player.status === "cut" || player.position === "CUT";
+                const hasScore = typeof player.score === "string" && player.score.length > 0;
                 const scoreColor =
                   isCut ? "#FF6B6B" :
-                  player.score.startsWith("-") ? "#4ADE80" :
+                  hasScore && player.score!.startsWith("-") ? "#4ADE80" :
                   player.score === "E" ? "rgba(255,255,255,0.5)" :
                   "#FF6B6B";
 
@@ -199,15 +222,17 @@ export default function TierPlayerList({ tiers, onPlayerSelect }: TierPlayerList
 
                       {/* Right: score + checkbox */}
                       <div className="flex items-center" style={{ gap: "12px", flexShrink: 0 }}>
-                        <span
-                          style={{
-                            color: scoreColor,
-                            fontWeight: 500,
-                            fontSize: "clamp(12px, 1.1vw, 16px)",
-                          }}
-                        >
-                          {player.score}
-                        </span>
+                        {hasScore && (
+                          <span
+                            style={{
+                              color: scoreColor,
+                              fontWeight: 500,
+                              fontSize: "clamp(12px, 1.1vw, 16px)",
+                            }}
+                          >
+                            {player.score}
+                          </span>
+                        )}
 
                         <div
                           onClick={() => handleSelect(tier, player)}
@@ -246,6 +271,8 @@ export default function TierPlayerList({ tiers, onPlayerSelect }: TierPlayerList
                   </div>
                 );
               })}
+              </div>
+            )}
 
             {/* Collapsed summary */}
             {isCollapsed && (

@@ -1,7 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import type { Tournament, TournamentResults, TournamentResultPlayer } from "@/app/types/fantasy";
+import React, { useState, useEffect, useMemo } from "react";
+import type { Tournament } from "@/app/types/fantasy";
+
+// Shape of the /fantasy endpoint response (leaderboard is denormalized in DB JSONB)
+type FantasyLeaderboardRow = {
+  playerId: string;
+  position: string;
+  name: string;
+  country: string;
+  score: string;
+  status: string;
+  thru: string;
+  currentRoundScore?: string;
+  rounds: string[];
+  totalStrokes: string;
+};
+type CompletedResults = {
+  courseName: string | null;
+  rows: FantasyLeaderboardRow[];
+};
 import { api } from "@/app/services/api";
 
 interface TournamentSectionProps {
@@ -36,7 +54,7 @@ function getCountryFlag(country: string) {
   return String.fromCodePoint(...[...code].map((c) => c.charCodeAt(0) + offset));
 }
 
-function getScoreColor(player: TournamentResultPlayer) {
+function getScoreColor(player: FantasyLeaderboardRow) {
   if (player.status === "cut" || player.position === "CUT") return "#FF6B6B";
   if (player.score.startsWith("-")) return "#4ADE80";
   if (player.score === "E") return "rgba(255,255,255,0.5)";
@@ -58,13 +76,66 @@ export default function TournamentSection({
   loading,
   availableTournId,
 }: TournamentSectionProps) {
-  const defaultTab: Tab = upcoming.length > 0 ? "upcoming" : live.length > 0 ? "live" : "completed";
-  const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
+  const [activeTab, setActiveTab] = useState<Tab>("upcoming");
+
+  // Update active tab when data loads
+  useEffect(() => {
+    if (!loading) {
+      if (live.length > 0) {
+        setActiveTab("live");
+      } else if (upcoming.length > 0) {
+        setActiveTab("upcoming");
+      } else if (completed.length > 0) {
+        setActiveTab("completed");
+      }
+    }
+  }, [loading, live.length, upcoming.length, completed.length]);
 
   // Expanded completed tournament state
   const [expandedTournId, setExpandedTournId] = useState<string | null>(null);
-  const [resultsData, setResultsData] = useState<Record<string, TournamentResults>>({});
+  const [resultsData, setResultsData] = useState<Record<string, CompletedResults>>({});
   const [resultsLoading, setResultsLoading] = useState<string | null>(null);
+
+  // Track which upcoming tournaments have picks
+  const [tournamentsWithPicks, setTournamentsWithPicks] = useState<Set<string>>(new Set());
+  const [picksLoading, setPicksLoading] = useState(true);
+
+  // Find the next upcoming tournament (earliest start date)
+  const nextUpcomingTournament = useMemo(() => {
+    if (upcoming.length === 0) return null;
+    const sorted = [...upcoming].sort((a, b) => {
+      const dateA = new Date(a.startDate).getTime();
+      const dateB = new Date(b.startDate).getTime();
+      return dateA - dateB;
+    });
+    return sorted[0];
+  }, [upcoming]);
+
+  // Fetch picks only for the next upcoming tournament
+  useEffect(() => {
+    const fetchPicks = async () => {
+      if (!nextUpcomingTournament) {
+        setPicksLoading(false);
+        return;
+      }
+
+      try {
+        const res = await api.golf.getPicks(nextUpcomingTournament.tournId);
+        if (res.success && res.data && res.data.picks) {
+          const picksCount = Object.values(res.data.picks).filter(Boolean).length;
+          if (picksCount > 0) {
+            setTournamentsWithPicks(new Set([nextUpcomingTournament.tournId]));
+          }
+        }
+      } catch {
+        // Silent fail
+      } finally {
+        setPicksLoading(false);
+      }
+    };
+
+    fetchPicks();
+  }, [nextUpcomingTournament]);
 
   const lists: Record<Tab, Tournament[]> = { live, upcoming, completed };
   const events = lists[activeTab];
@@ -79,9 +150,11 @@ export default function TournamentSection({
 
     setResultsLoading(tournId);
     try {
-      const res = await api.golf.getTournamentResults(tournId);
+      const res = await api.golf.getTournamentFantasy(tournId);
       if (res.success && res.data) {
-        setResultsData((prev) => ({ ...prev, [tournId]: res.data as TournamentResults }));
+        const d = res.data as { tournament: { courseName: string | null }; leaderboard: { rows: FantasyLeaderboardRow[] } | null };
+        const rows = d.leaderboard?.rows ?? [];
+        setResultsData((prev) => ({ ...prev, [tournId]: { courseName: d.tournament.courseName, rows } }));
       }
     } catch {
       // silently fail
@@ -146,8 +219,23 @@ export default function TournamentSection({
 
       {/* Loading */}
       {loading && (
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", padding: "20px 0", textAlign: "center" }}>
-          Loading tournaments...
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "40px 0" }}>
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              border: "3px solid rgba(232,201,106,0.2)",
+              borderTop: "3px solid #E8C96A",
+              borderRadius: "50%",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <style jsx>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       )}
 
@@ -158,61 +246,851 @@ export default function TournamentSection({
         </div>
       )}
 
-      {/* Event list */}
-      {!loading && events.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {/* Event list - Table format for upcoming */}
+      {!loading && events.length > 0 && activeTab === "upcoming" && (
+        <>
+          {/* Desktop Table */}
+          <div
+            className="hidden md:block"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.03)",
+              borderRadius: "5px",
+              overflow: "hidden",
+            }}
+          >
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "left",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Tournament
+                  </th>
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "left",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Dates
+                  </th>
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "center",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => {
+                  const isNextUpcoming = nextUpcomingTournament?.tournId === event.tournId;
+                  const hasData = event.tournId === availableTournId;
+                  const hasPicks = tournamentsWithPicks.has(event.tournId);
+                  const disabled = !isNextUpcoming || (!hasData && !hasPicks);
+                  
+                  let buttonText = "Pick Players";
+                  let buttonColor = "#E8C96A";
+                  
+                  if (!isNextUpcoming) {
+                    buttonText = "Coming Soon";
+                  } else if (hasPicks) {
+                    buttonText = "View Picks";
+                    buttonColor = "#E8C96A";
+                  } else if (disabled) {
+                    buttonText = "Coming Soon";
+                  }
+
+                  return (
+                    <tr
+                      key={event.tournId}
+                      style={{
+                        borderBottom: "1px solid rgba(255,255,255,0.05)",
+                        transition: "background-color 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(232,201,106,0.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "10px 16px",
+                        }}
+                      >
+                        <div className="flex items-center" style={{ gap: "8px" }}>
+                          <span
+                            style={{
+                              color: "#FFFFFF",
+                              fontWeight: 500,
+                              fontSize: "clamp(12px, 1.5vw, 14px)",
+                            }}
+                          >
+                            {event.name}
+                          </span>
+                          {event.isMajor && (
+                            <span
+                              style={{
+                                fontSize: "9px",
+                                fontWeight: 600,
+                                backgroundColor: "#E8C96A",
+                                color: "#060D1F",
+                                padding: "2px 6px",
+                                borderRadius: "3px",
+                                flexShrink: 0,
+                              }}
+                            >
+                              MAJOR
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 16px",
+                          color: "rgba(255,255,255,0.6)",
+                          fontSize: "clamp(11px, 1.5vw, 13px)",
+                        }}
+                      >
+                        {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 16px",
+                          textAlign: "center",
+                        }}
+                      >
+                        <button
+                          disabled={disabled}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!disabled) onSelect(event.tournId);
+                          }}
+                          style={{
+                            padding: "6px 16px",
+                            borderRadius: "5px",
+                            border: "none",
+                            cursor: disabled ? "not-allowed" : "pointer",
+                            fontSize: "clamp(11px, 1.5vw, 12px)",
+                            fontWeight: 600,
+                            fontFamily: "var(--font-poppins), sans-serif",
+                            backgroundColor: disabled ? "rgba(255,255,255,0.08)" : buttonColor,
+                            color: disabled ? "rgba(255,255,255,0.3)" : "#060D1F",
+                            whiteSpace: "nowrap",
+                            transition: "all 0.2s ease",
+                            opacity: disabled ? 0.6 : 1,
+                          }}
+                        >
+                          {buttonText}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {events.map((event) => {
-            const isCompleted = activeTab === "completed";
-            const isLive = activeTab === "live";
-            const isUpcoming = activeTab === "upcoming";
+            const isNextUpcoming = nextUpcomingTournament?.tournId === event.tournId;
+            const hasData = event.tournId === availableTournId;
+            const hasPicks = tournamentsWithPicks.has(event.tournId);
+            const disabled = !isNextUpcoming || (!hasData && !hasPicks);
+            
+            let buttonText = "Pick Players";
+            let buttonColor = "#E8C96A";
+            
+            if (!isNextUpcoming) {
+              buttonText = "Coming Soon";
+            } else if (hasPicks) {
+              buttonText = "View Picks";
+              buttonColor = "#E8C96A";
+            } else if (disabled) {
+              buttonText = "Coming Soon";
+            }
+
+            return (
+              <div
+                key={event.tournId}
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.03)",
+                  borderRadius: "5px",
+                  padding: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="flex items-center" style={{ gap: "6px", marginBottom: "4px", flexWrap: "wrap" }}>
+                    <span style={{ color: "#FFFFFF", fontWeight: 500, fontSize: "14px" }}>
+                      {event.name}
+                    </span>
+                    {event.isMajor && (
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          fontWeight: 600,
+                          backgroundColor: "#E8C96A",
+                          color: "#060D1F",
+                          padding: "2px 6px",
+                          borderRadius: "3px",
+                          flexShrink: 0,
+                        }}
+                      >
+                        MAJOR
+                      </span>
+                    )}
+                    <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", marginLeft: "4px" }}>
+                      {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                    </span>
+                  </div>
+                  <div className="sm:hidden" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px" }}>
+                    {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                  </div>
+                </div>
+                <button
+                  disabled={disabled}
+                  onClick={() => !disabled && onSelect(event.tournId)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "5px",
+                    border: "none",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    fontFamily: "var(--font-poppins), sans-serif",
+                    backgroundColor: disabled ? "rgba(255,255,255,0.08)" : buttonColor,
+                    color: disabled ? "rgba(255,255,255,0.3)" : "#060D1F",
+                    transition: "all 0.2s ease",
+                    opacity: disabled ? 0.6 : 1,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
+                  {buttonText}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </>
+      )}
+
+      {/* Event list - Table format for live */}
+      {!loading && events.length > 0 && activeTab === "live" && (
+        <>
+          {/* Desktop Table */}
+          <div
+            className="hidden md:block"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.03)",
+              borderRadius: "5px",
+              overflow: "hidden",
+            }}
+          >
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "left",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Tournament
+                  </th>
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "left",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Dates
+                  </th>
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "center",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => {
+                  return (
+                    <tr
+                      key={event.tournId}
+                      style={{
+                        borderBottom: "1px solid rgba(255,255,255,0.05)",
+                        transition: "background-color 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(74,222,128,0.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "clamp(12px, 2vw, 16px)",
+                        }}
+                      >
+                        <div className="flex items-center" style={{ gap: "8px" }}>
+                          <span
+                            style={{
+                              color: "#FFFFFF",
+                              fontWeight: 500,
+                              fontSize: "clamp(12px, 1.5vw, 14px)",
+                            }}
+                          >
+                            {event.name}
+                          </span>
+                          {event.isMajor && (
+                            <span
+                              style={{
+                                fontSize: "9px",
+                                fontWeight: 600,
+                                backgroundColor: "#E8C96A",
+                                color: "#060D1F",
+                                padding: "2px 6px",
+                                borderRadius: "3px",
+                                flexShrink: 0,
+                              }}
+                            >
+                              MAJOR
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              fontWeight: 600,
+                              backgroundColor: "#4ADE80",
+                              color: "#060D1F",
+                              padding: "2px 6px",
+                              borderRadius: "3px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            LIVE
+                          </span>
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          padding: "clamp(12px, 2vw, 16px)",
+                          color: "rgba(255,255,255,0.6)",
+                          fontSize: "clamp(11px, 1.5vw, 13px)",
+                        }}
+                      >
+                        {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                      </td>
+                      <td
+                        style={{
+                          padding: "clamp(12px, 2vw, 16px)",
+                          textAlign: "center",
+                        }}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelect(event.tournId);
+                          }}
+                          style={{
+                            padding: "6px 16px",
+                            borderRadius: "5px",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "clamp(11px, 1.5vw, 12px)",
+                            fontWeight: 600,
+                            fontFamily: "var(--font-poppins), sans-serif",
+                            backgroundColor: "#4ADE80",
+                            color: "#060D1F",
+                            whiteSpace: "nowrap",
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          View Live
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {events.map((event) => {
+            return (
+              <div
+                key={event.tournId}
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.03)",
+                  borderRadius: "5px",
+                  padding: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="flex items-center" style={{ gap: "6px", marginBottom: "4px", flexWrap: "wrap" }}>
+                    <span style={{ color: "#FFFFFF", fontWeight: 500, fontSize: "14px" }}>
+                      {event.name}
+                    </span>
+                    {event.isMajor && (
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          fontWeight: 600,
+                          backgroundColor: "#E8C96A",
+                          color: "#060D1F",
+                          padding: "2px 6px",
+                          borderRadius: "3px",
+                          flexShrink: 0,
+                        }}
+                      >
+                        MAJOR
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        fontWeight: 600,
+                        backgroundColor: "#4ADE80",
+                        color: "#060D1F",
+                        padding: "2px 6px",
+                        borderRadius: "3px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      LIVE
+                    </span>
+                    <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", marginLeft: "4px" }}>
+                      {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                    </span>
+                  </div>
+                  <div className="sm:hidden" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px" }}>
+                    {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => onSelect(event.tournId)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "5px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    fontFamily: "var(--font-poppins), sans-serif",
+                    backgroundColor: "#4ADE80",
+                    color: "#060D1F",
+                    transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
+                  View Live
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </>
+      )}
+
+      {/* Event list - Table format for completed */}
+      {!loading && events.length > 0 && activeTab === "completed" && (
+        <>
+          {/* Desktop Table */}
+          <div
+            className="hidden md:block"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.03)",
+              borderRadius: "5px",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                }}
+              >
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "left",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Tournament
+                  </th>
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "left",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Dates
+                  </th>
+                  <th
+                    style={{
+                      padding: "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px)",
+                      textAlign: "center",
+                      color: "rgba(255,255,255,0.6)",
+                      fontSize: "clamp(10px, 1.5vw, 12px)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => {
+                  const isExpanded = expandedTournId === event.tournId;
+                  const results = resultsData[event.tournId];
+                  const isLoadingResults = resultsLoading === event.tournId;
+
+                  return (
+                    <React.Fragment key={event.tournId}>
+                      <tr
+                        style={{
+                          borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.05)",
+                          transition: "background-color 0.2s ease",
+                          backgroundColor: isExpanded ? "rgba(232,201,106,0.05)" : "transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isExpanded) {
+                            e.currentTarget.style.backgroundColor = "rgba(232,201,106,0.05)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isExpanded) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "clamp(12px, 2vw, 16px)",
+                          }}
+                        >
+                          <div className="flex items-center" style={{ gap: "8px" }}>
+                            <span
+                              style={{
+                                color: isExpanded ? "#E8C96A" : "#FFFFFF",
+                                fontWeight: 500,
+                                fontSize: "clamp(12px, 1.5vw, 14px)",
+                              }}
+                            >
+                              {event.name}
+                            </span>
+                            {event.isMajor && (
+                              <span
+                                style={{
+                                  fontSize: "9px",
+                                  fontWeight: 600,
+                                  backgroundColor: "#E8C96A",
+                                  color: "#060D1F",
+                                  padding: "2px 6px",
+                                  borderRadius: "3px",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                MAJOR
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td
+                          style={{
+                            padding: "clamp(12px, 2vw, 16px)",
+                            color: "rgba(255,255,255,0.6)",
+                            fontSize: "clamp(11px, 1.5vw, 13px)",
+                          }}
+                        >
+                          {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                        </td>
+                        <td
+                          style={{
+                            padding: "clamp(12px, 2vw, 16px)",
+                            textAlign: "center",
+                          }}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCompletedClick(event.tournId);
+                            }}
+                            style={{
+                              padding: "6px 16px",
+                              borderRadius: "5px",
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: "clamp(11px, 1.5vw, 12px)",
+                              fontWeight: 600,
+                              fontFamily: "var(--font-poppins), sans-serif",
+                              backgroundColor: isExpanded ? "#E8C96A" : "rgba(255,255,255,0.1)",
+                              color: isExpanded ? "#060D1F" : "rgba(255,255,255,0.7)",
+                              whiteSpace: "nowrap",
+                              transition: "all 0.2s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              margin: "0 auto",
+                            }}
+                          >
+                            {isExpanded ? "Hide" : "View"} Results
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{
+                                transition: "transform 0.2s ease",
+                                transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                              }}
+                            >
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Expanded results row */}
+                      {isExpanded && (
+                        <tr>
+                          <td
+                            colSpan={3}
+                            style={{
+                              padding: 0,
+                              borderBottom: "1px solid rgba(255,255,255,0.05)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                backgroundColor: "rgba(232,201,106,0.04)",
+                                padding: "clamp(12px, 2vw, 16px)",
+                              }}
+                            >
+                              {isLoadingResults && (
+                                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", textAlign: "center", padding: "16px 0" }}>
+                                  Loading results...
+                                </div>
+                              )}
+
+                              {!isLoadingResults && !results && (
+                                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", textAlign: "center", padding: "16px 0" }}>
+                                  No results available
+                                </div>
+                              )}
+
+                              {!isLoadingResults && results && (
+                                <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto" }}>
+                                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                                    <thead style={{ position: "sticky", top: 0, backgroundColor: "#13192A", zIndex: 1 }}>
+                                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                                        <th style={{ padding: "8px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Pos</th>
+                                        <th style={{ padding: "8px 8px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase", minWidth: "140px" }}>Player</th>
+                                        <th style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R1</th>
+                                        <th style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R2</th>
+                                        <th style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R3</th>
+                                        <th style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R4</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Total</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Thru</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {results.rows.map((player, i) => {
+                                        const flag = getCountryFlag(player.country);
+                                        const isCut = player.status === "cut" || player.position === "CUT";
+                                        const isWinner = i === 0;
+                                        return (
+                                          <tr
+                                            key={player.playerId || i}
+                                            style={{
+                                              borderBottom: i < results.rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                                            }}
+                                          >
+                                            <td style={{ padding: "10px 4px", color: isWinner ? "#E8C96A" : "rgba(255,255,255,0.5)", fontWeight: isWinner ? 600 : 400, fontSize: "12px" }}>
+                                              {isCut ? "CUT" : player.position}
+                                            </td>
+                                            <td style={{ padding: "10px 8px" }}>
+                                              <div className="flex items-center" style={{ gap: "6px" }}>
+                                                {isWinner && <span style={{ fontSize: "14px" }}>🏆</span>}
+                                                <span style={{ color: isWinner ? "#E8C96A" : "#FFFFFF", fontWeight: isWinner ? 600 : 400 }}>
+                                                  {player.name}
+                                                </span>
+                                                {flag && <span style={{ fontSize: "11px" }}>{flag}</span>}
+                                              </div>
+                                            </td>
+                                            <td style={{ padding: "10px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+                                              {player.rounds[0] || "-"}
+                                            </td>
+                                            <td style={{ padding: "10px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+                                              {player.rounds[1] || "-"}
+                                            </td>
+                                            <td style={{ padding: "10px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+                                              {player.rounds[2] || "-"}
+                                            </td>
+                                            <td style={{ padding: "10px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+                                              {player.rounds[3] || "-"}
+                                            </td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: getScoreColor(player), fontWeight: 600 }}>
+                                              {player.score}
+                                            </td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "11px" }}>
+                                              {player.thru || "F"}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", textAlign: "center", marginTop: "12px" }}>
+                                    {results.rows.length} players · {results.courseName}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+            </div>
+          </div>
+
+          {/* Mobile Card View */}
+        <div className="md:hidden" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {events.map((event) => {
             const isExpanded = expandedTournId === event.tournId;
             const results = resultsData[event.tournId];
             const isLoadingResults = resultsLoading === event.tournId;
 
             return (
               <div key={event.tournId}>
-                {/* Card */}
                 <div
-                  onClick={() => {
-                    if (isCompleted) handleCompletedClick(event.tournId);
-                  }}
                   style={{
+                    backgroundColor: isExpanded ? "rgba(232,201,106,0.08)" : "rgba(255,255,255,0.03)",
+                    borderRadius: isExpanded ? "5px 5px 0 0" : "5px",
+                    padding: "12px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "12px 14px",
-                    borderRadius: isExpanded ? "5px 5px 0 0" : "5px",
-                    border: isExpanded ? "1.5px solid #E8C96A" : "1.5px solid transparent",
-                    borderBottom: isExpanded ? "1.5px solid rgba(232,201,106,0.3)" : undefined,
-                    backgroundColor: isExpanded ? "rgba(232,201,106,0.08)" : "rgba(255,255,255,0.03)",
-                    cursor: isCompleted ? "pointer" : "default",
-                    textAlign: "left",
-                    width: "100%",
-                    fontFamily: "var(--font-poppins), sans-serif",
-                    transition: "all 0.2s ease",
+                    gap: "12px",
+                    border: isExpanded ? "1px solid #E8C96A" : "none",
+                    borderBottom: isExpanded ? "1px solid rgba(232,201,106,0.3)" : "none",
                   }}
                 >
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div className="flex items-center" style={{ gap: "8px", marginBottom: "2px" }}>
-                      <span
-                        style={{
-                          color: isExpanded ? "#E8C96A" : "#FFFFFF",
-                          fontWeight: 500,
-                          fontSize: "clamp(13px, 1.2vw, 15px)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="flex items-center" style={{ gap: "6px", marginBottom: "4px", flexWrap: "wrap" }}>
+                      <span style={{ color: isExpanded ? "#E8C96A" : "#FFFFFF", fontWeight: 500, fontSize: "14px" }}>
                         {event.name}
-                        <span style={{ color: "rgba(255,255,255,0.4)", fontWeight: 400, marginLeft: "8px", fontSize: "12px" }}>
-                          {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
-                        </span>
                       </span>
                       {event.isMajor && (
                         <span
                           style={{
-                            fontSize: "10px",
+                            fontSize: "9px",
                             fontWeight: 600,
                             backgroundColor: "#E8C96A",
                             color: "#060D1F",
@@ -224,102 +1102,63 @@ export default function TournamentSection({
                           MAJOR
                         </span>
                       )}
-                      {event.status === "live" && (
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            backgroundColor: "#4ADE80",
-                            color: "#060D1F",
-                            padding: "2px 6px",
-                            borderRadius: "3px",
-                            flexShrink: 0,
-                          }}
-                        >
-                          LIVE
-                        </span>
-                      )}
+                      <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", marginLeft: "4px" }}>
+                        {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                      </span>
                     </div>
-                    <div
+                    <div className="sm:hidden" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px" }}>
+                      {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCompletedClick(event.tournId)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "5px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      fontFamily: "var(--font-poppins), sans-serif",
+                      backgroundColor: isExpanded ? "#E8C96A" : "rgba(255,255,255,0.1)",
+                      color: isExpanded ? "#060D1F" : "rgba(255,255,255,0.7)",
+                      transition: "all 0.2s ease",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    {isExpanded ? "Hide" : "View"}
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                       style={{
-                        color: "rgba(255,255,255,0.45)",
-                        fontSize: "12px",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        transition: "transform 0.2s ease",
+                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
                       }}
                     >
-                      {event.courseName}
-                      {event.city && ` · ${event.city}`}
-                      {event.state && `, ${event.state}`}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center" style={{ gap: "8px", flexShrink: 0, marginLeft: "12px" }}>
-                    {/* Pick Players / View Live button for upcoming & live */}
-                    {(isUpcoming || isLive) && (() => {
-                      const hasData = event.tournId === availableTournId;
-                      const disabled = !hasData && !isLive;
-                      return (
-                      <button
-                        disabled={disabled}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!disabled) onSelect(event.tournId);
-                        }}
-                        style={{
-                          padding: "6px 16px",
-                          borderRadius: "5px",
-                          border: "none",
-                          cursor: disabled ? "not-allowed" : "pointer",
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          fontFamily: "var(--font-poppins), sans-serif",
-                          backgroundColor: disabled ? "rgba(255,255,255,0.08)" : isLive ? "#4ADE80" : "#E8C96A",
-                          color: disabled ? "rgba(255,255,255,0.3)" : "#060D1F",
-                          whiteSpace: "nowrap",
-                          transition: "all 0.2s ease",
-                          opacity: disabled ? 0.6 : 1,
-                        }}
-                      >
-                        {isLive ? "View Live" : disabled ? "Coming Soon" : "Pick Players"}
-                      </button>
-                      );
-                    })()}
-
-                    {/* Chevron for completed */}
-                    {isCompleted && (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="rgba(255,255,255,0.4)"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{
-                          transition: "transform 0.2s ease",
-                          transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                        }}
-                      >
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    )}
-                  </div>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
                 </div>
 
-                {/* Expanded results for completed tournaments */}
-                {isCompleted && isExpanded && (
+                {/* Expanded results */}
+                {isExpanded && (
                   <div
                     style={{
-                      border: "1.5px solid #E8C96A",
+                      border: "1px solid #E8C96A",
                       borderTop: "none",
                       borderRadius: "0 0 5px 5px",
                       backgroundColor: "rgba(232,201,106,0.04)",
-                      padding: "12px 14px",
-                      maxHeight: "400px",
-                      overflowY: "auto",
+                      padding: "12px",
                     }}
                   >
                     {isLoadingResults && (
@@ -335,110 +1174,71 @@ export default function TournamentSection({
                     )}
 
                     {!isLoadingResults && results && (
-                      <>
-                        {results.players.length > 0 && (
-                          <div
-                            className="flex items-center justify-between"
-                            style={{
-                              padding: "10px 12px",
-                              backgroundColor: "rgba(232,201,106,0.1)",
-                              borderRadius: "5px",
-                              marginBottom: "12px",
-                            }}
-                          >
-                            <div className="flex items-center" style={{ gap: "10px" }}>
-                              <span style={{ fontSize: "18px" }}>🏆</span>
-                              <div>
-                                <div style={{ color: "#E8C96A", fontWeight: 600, fontSize: "14px" }}>
-                                  {results.players[0].name}
-                                  {getCountryFlag(results.players[0].country) && (
-                                    <span style={{ marginLeft: "6px", fontSize: "13px" }}>
-                                      {getCountryFlag(results.players[0].country)}
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px" }}>
-                                  Winner · {results.courseName}
-                                </div>
-                              </div>
-                            </div>
-                            <span
-                              style={{
-                                color: results.players[0].score.startsWith("-") ? "#4ADE80" : "rgba(255,255,255,0.5)",
-                                fontWeight: 600,
-                                fontSize: "16px",
-                              }}
-                            >
-                              {results.players[0].score}
-                            </span>
-                          </div>
-                        )}
-
-                        {results.players.map((player, i) => {
-                          const flag = getCountryFlag(player.country);
-                          const isCut = player.status === "cut" || player.position === "CUT";
-                          return (
-                            <div key={player.playerId || i}>
-                              <div className="flex items-center justify-between" style={{ padding: "8px 0" }}>
-                                <div className="flex items-center" style={{ gap: "10px", minWidth: 0 }}>
-                                  <span
-                                    style={{
-                                      color: i === 0 ? "#E8C96A" : "rgba(255,255,255,0.5)",
-                                      width: "28px",
-                                      textAlign: "right",
-                                      flexShrink: 0,
-                                      fontSize: "12px",
-                                      fontWeight: i < 3 ? 600 : 400,
-                                    }}
-                                  >
+                      <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                          <thead style={{ position: "sticky", top: 0, backgroundColor: "#13192A", zIndex: 1 }}>
+                            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                              <th style={{ padding: "6px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Pos</th>
+                              <th style={{ padding: "6px 6px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase", minWidth: "100px" }}>Player</th>
+                              <th style={{ padding: "6px 3px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R1</th>
+                              <th style={{ padding: "6px 3px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R2</th>
+                              <th style={{ padding: "6px 3px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R3</th>
+                              <th style={{ padding: "6px 3px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R4</th>
+                              <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Total</th>
+                              <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Thru</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {results.rows.map((player, i) => {
+                              const flag = getCountryFlag(player.country);
+                              const isCut = player.status === "cut" || player.position === "CUT";
+                              const isWinner = i === 0;
+                              return (
+                                <tr
+                                  key={player.playerId || i}
+                                  style={{
+                                    borderBottom: i < results.rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                                  }}
+                                >
+                                  <td style={{ padding: "8px 4px", color: isWinner ? "#E8C96A" : "rgba(255,255,255,0.5)", fontWeight: isWinner ? 600 : 400, fontSize: "11px" }}>
                                     {isCut ? "CUT" : player.position}
-                                  </span>
-                                  <div style={{ minWidth: 0 }}>
-                                    <div className="flex items-center" style={{ gap: "6px" }}>
-                                      <span
-                                        style={{
-                                          color: i < 3 ? "#E8C96A" : "#FFFFFF",
-                                          fontWeight: i < 3 ? 500 : 400,
-                                          fontSize: "13px",
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
+                                  </td>
+                                  <td style={{ padding: "8px 6px" }}>
+                                    <div className="flex items-center" style={{ gap: "4px" }}>
+                                      {isWinner && <span style={{ fontSize: "12px" }}>🏆</span>}
+                                      <span style={{ color: isWinner ? "#E8C96A" : "#FFFFFF", fontWeight: isWinner ? 600 : 400, fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                         {player.name}
                                       </span>
-                                      {flag && <span style={{ fontSize: "12px", flexShrink: 0 }}>{flag}</span>}
+                                      {flag && <span style={{ fontSize: "10px", flexShrink: 0 }}>{flag}</span>}
                                     </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center" style={{ gap: "12px", flexShrink: 0 }}>
-                                  {player.rounds.length > 0 && (
-                                    <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "11px" }}>
-                                      {player.rounds.join(" · ")}
-                                    </span>
-                                  )}
-                                  <span
-                                    style={{
-                                      color: getScoreColor(player),
-                                      fontWeight: 500,
-                                      fontSize: "13px",
-                                      minWidth: "32px",
-                                      textAlign: "right",
-                                    }}
-                                  >
+                                  </td>
+                                  <td style={{ padding: "8px 3px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>
+                                    {player.rounds[0] || "-"}
+                                  </td>
+                                  <td style={{ padding: "8px 3px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>
+                                    {player.rounds[1] || "-"}
+                                  </td>
+                                  <td style={{ padding: "8px 3px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>
+                                    {player.rounds[2] || "-"}
+                                  </td>
+                                  <td style={{ padding: "8px 3px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>
+                                    {player.rounds[3] || "-"}
+                                  </td>
+                                  <td style={{ padding: "8px 4px", textAlign: "center", color: getScoreColor(player), fontWeight: 600, fontSize: "11px" }}>
                                     {player.score}
-                                  </span>
-                                </div>
-                              </div>
-                              {i < results.players.length - 1 && <div style={dividerStyle} />}
-                            </div>
-                          );
-                        })}
-
-                        <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", textAlign: "center", marginTop: "8px" }}>
-                          {results.players.length} players
+                                  </td>
+                                  <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "10px" }}>
+                                    {player.thru || "F"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "10px", textAlign: "center", marginTop: "10px" }}>
+                          {results.rows.length} players · {results.courseName}
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 )}
@@ -446,7 +1246,9 @@ export default function TournamentSection({
             );
           })}
         </div>
+      </>
       )}
+
     </div>
   );
 }

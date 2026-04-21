@@ -5,30 +5,42 @@ import { useRouter } from "next/navigation";
 import TournamentSection from "@/app/components/fantasy/TournamentSection";
 import FantasyStats from "@/app/components/fantasy/FantasyStats";
 import { api } from "@/app/services/api";
-import { FANTASY_STATS, MOCK_TOURNAMENTS, STATIC_TIER_FILES } from "@/app/lib/fantasy-data";
+import { FANTASY_STATS } from "@/app/lib/fantasy-data";
 import type { TournamentList } from "@/app/types/fantasy";
+
+const EMPTY: TournamentList = { completed: [], live: [], upcoming: [] };
+
+// Simple in-memory cache
+let tournamentsCache: { data: TournamentList; timestamp: number } | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export default function FantasyGolfPage() {
   const router = useRouter();
-  const [tournaments, setTournaments] = useState<TournamentList>(MOCK_TOURNAMENTS);
-  const [tournLoading, setTournLoading] = useState(true);
-  const [availableTournId, setAvailableTournId] = useState<string | null>(null);
+  const [tournaments, setTournaments] = useState<TournamentList>(tournamentsCache?.data || EMPTY);
+  const [tournLoading, setTournLoading] = useState(!tournamentsCache);
 
   useEffect(() => {
     let cancelled = false;
+    
+    // Check if cache is valid
+    const now = Date.now();
+    if (tournamentsCache && (now - tournamentsCache.timestamp) < CACHE_DURATION) {
+      setTournaments(tournamentsCache.data);
+      setTournLoading(false);
+      return;
+    }
+
     (async () => {
       try {
         const res = await api.golf.getTournaments();
         if (!cancelled && res.success && res.data) {
           const data = res.data as TournamentList;
-          const hasEvents = data.completed.length + data.live.length + data.upcoming.length > 0;
-          if (hasEvents) setTournaments(data);
-          else setTournaments(MOCK_TOURNAMENTS);
-        } else {
-          setTournaments(MOCK_TOURNAMENTS);
+          setTournaments(data);
+          // Update cache
+          tournamentsCache = { data, timestamp: Date.now() };
         }
       } catch {
-        setTournaments(MOCK_TOURNAMENTS);
+        // leave EMPTY on failure
       } finally {
         if (!cancelled) setTournLoading(false);
       }
@@ -36,20 +48,14 @@ export default function FantasyGolfPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Check if next upcoming tournament has player data (static JSON)
-  useEffect(() => {
-    const next = tournaments.upcoming[0] || tournaments.live[0];
-    if (!next) return;
-    const file = STATIC_TIER_FILES[next.tournId];
-    if (!file) { setAvailableTournId(null); return; }
-    fetch(file, { method: "HEAD" })
-      .then((res) => setAvailableTournId(res.ok ? next.tournId : null))
-      .catch(() => setAvailableTournId(null));
-  }, [tournaments]);
+  // Signal "field ready" — first upcoming/live tournament with fieldAvailable=true
+  const availableTournId =
+    tournaments.upcoming.find((t) => t.fieldAvailable)?.tournId ||
+    tournaments.live.find((t) => t.fieldAvailable)?.tournId ||
+    null;
 
   return (
     <>
-      {/* Page Title */}
       <div
         className="tracking-wide"
         style={{
@@ -72,10 +78,12 @@ export default function FantasyGolfPage() {
         Fantasy Golf · Pick your players each week and compete with your club
       </div>
 
-      {/* Stats Cards */}
-      <FantasyStats stats={FANTASY_STATS} />
+      <FantasyStats 
+        stats={FANTASY_STATS} 
+        liveTournaments={tournaments.live}
+        upcomingTournaments={tournaments.upcoming}
+      />
 
-      {/* Tournament Tabs */}
       <TournamentSection
         completed={tournaments.completed}
         live={tournaments.live}
