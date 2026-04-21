@@ -55,6 +55,21 @@ export const api = {
       fetchApi("/auth/login", { method: "POST", body: JSON.stringify(body) }),
 
     me: () => fetchApi<{ user: User }>("/auth/me"),
+
+    forgotPassword: (email: string) =>
+      fetchApi("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+
+    verifyOtp: (email: string, otp: string) =>
+      fetchApi<{ resetToken: string }>("/auth/verify-otp", {
+        method: "POST",
+        body: JSON.stringify({ email, otp }),
+      }),
+
+    resetPassword: (resetToken: string, newPassword: string) =>
+      fetchApi("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ resetToken, newPassword }),
+      }),
   },
 
   dashboard: {
