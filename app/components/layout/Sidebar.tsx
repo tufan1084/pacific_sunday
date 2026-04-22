@@ -3,8 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { NAV_ITEMS } from "@/app/lib/constants";
 import { H2HIcon } from "@/app/components/ui/Icons";
+import { api } from "@/app/services/api";
 
 const ICON_IMAGE_MAP: Record<string, string> = {
   dashboard: "/icons/dashboard.svg",
@@ -28,6 +30,35 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const [newPostsCount, setNewPostsCount] = useState(0);
+
+  useEffect(() => {
+    fetchNewPostsCount();
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchNewPostsCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchNewPostsCount = async () => {
+    try {
+      const lastVisit = localStorage.getItem('community_last_visit');
+      if (!lastVisit) {
+        setNewPostsCount(0);
+        return;
+      }
+
+      const res = await api.posts.getAll(100, 0);
+      if (res.success) {
+        const posts = (res.data as any)?.posts || [];
+        const newPosts = posts.filter((post: any) => 
+          new Date(post.createdAt).getTime() > parseInt(lastVisit)
+        );
+        setNewPostsCount(newPosts.length);
+      }
+    } catch (error) {
+      console.error('Failed to fetch new posts count:', error);
+    }
+  };
 
   return (
     <>
@@ -70,12 +101,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <nav className="flex-1 overflow-y-auto space-y-1" style={{ paddingTop: "20px", paddingBottom: "20px" }}>
           {NAV_ITEMS.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const isCommunity = item.href === "/community";
+            const displayBadge = isCommunity ? newPostsCount : item.badge;
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={onClose}
+                onClick={() => {
+                  if (isCommunity) {
+                    localStorage.setItem('community_last_visit', Date.now().toString());
+                    setNewPostsCount(0);
+                  }
+                  onClose();
+                }}
                 className={`
                   flex items-center gap-3 h-[60px] transition-all duration-200
                   text-[14px] md:text-[15px] lg:text-[16px] xl:text-[18px] font-normal w-full
@@ -103,13 +142,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   />
                 )}
                 <span className="flex-1">{item.label}</span>
-                {item.badge !== undefined && (
+                {displayBadge !== undefined && displayBadge > 0 && (
                   <span
                     className={`text-[13px] font-medium ${
                       isActive ? "text-black" : "text-ps-gold"
                     }`}
                   >
-                    {item.badge}
+                    {displayBadge}
                   </span>
                 )}
               </Link>

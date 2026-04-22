@@ -2,11 +2,22 @@ import type { NavItem, StatCard, LeaderboardEntry, Pick, CommunityPost, WeatherD
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+// Socket.IO connects to the server origin (no /api suffix) — otherwise
+// socket.io-client treats the path segment as a namespace and errors with
+// "Invalid namespace".
+export const SOCKET_URL = (() => {
+  try {
+    return new URL(API_BASE_URL).origin;
+  } catch {
+    return "http://localhost:5000";
+  }
+})();
+
 export const NAV_ITEMS: NavItem[] = [
   { icon: "dashboard", label: "Dashboard", href: "/", isActive: true },
   { icon: "fantasy", label: "Fantasy Golf", href: "/fantasy-golf" },
   { icon: "h2h", label: "Head to Head", href: "/head-to-head", badge: 2 },
-  { icon: "community", label: "Community", href: "/community", badge: 22 },
+  { icon: "community", label: "Community", href: "/community" },
   { icon: "live", label: "Live Scores", href: "/live-scores" },
   { icon: "store", label: "Reward Store", href: "/reward-store" },
   { icon: "achievements", label: "Achievements", href: "/achievements", badge: 10 },

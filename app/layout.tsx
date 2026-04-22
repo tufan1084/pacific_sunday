@@ -22,7 +22,7 @@ const poppins = Poppins({
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isStandalonePage = pathname === "/n" || pathname === "/login";
+  const isStandalonePage = pathname === "/n" || pathname === "/login" || pathname?.startsWith("/post/");
 
   if (isStandalonePage) {
     return <>{children}</>;
