@@ -4,7 +4,11 @@ import { useState } from "react";
 import Button from "@/app/components/ui/Button";
 import NewPostModal from "@/app/components/community/NewPostModal";
 
-export default function CommunityHeader() {
+interface CommunityHeaderProps {
+  onPostCreated: () => void;
+}
+
+export default function CommunityHeader({ onPostCreated }: CommunityHeaderProps) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -27,7 +31,7 @@ export default function CommunityHeader() {
         <Button onClick={() => setShowModal(true)}>+ New Post</Button>
       </div>
 
-      {showModal && <NewPostModal onClose={() => setShowModal(false)} />}
+      {showModal && <NewPostModal onClose={() => setShowModal(false)} onPostCreated={onPostCreated} />}
     </>
   );
 }

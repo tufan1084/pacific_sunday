@@ -17,6 +17,7 @@ export default function ProfileCard({ profileData, golfPassport }: ProfileCardPr
   // Use real data from API if available, otherwise use mock data
   const user = profileData?.user || PROFILE_USER;
   const name = user.name || PROFILE_USER.name;
+  const username = user.username || null;
   const email = user.email || PROFILE_USER.username;
   const countryName = user.country || null;
   const totalBags = user.totalBags !== undefined ? user.totalBags : 0;
@@ -63,6 +64,9 @@ export default function ProfileCard({ profileData, golfPassport }: ProfileCardPr
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ color: "#E8C96A", fontSize: "clamp(15px, 1.8vw, 20px)", fontWeight: 500 }}>{name}</div>
+          {username && (
+            <div style={{ color: "#FFFFFF", fontSize: "clamp(10px, 1.1vw, 12px)", fontWeight: 400, marginTop: "2px" }}>@{username}</div>
+          )}
           <div style={{ color: "#FFFFFF", fontSize: "clamp(11px, 1.2vw, 14px)", fontWeight: 400, marginTop: "4px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</span>
             <span>·</span>

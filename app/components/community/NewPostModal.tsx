@@ -2,17 +2,20 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { api } from "@/app/services/api";
+import { useToast } from "@/app/context/ToastContext";
 
 interface NewPostModalProps {
   onClose: () => void;
+  onPostCreated: () => void;
 }
 
-export default function NewPostModal({ onClose }: NewPostModalProps) {
-  const [postType, setPostType] = useState("General Discussion");
+export default function NewPostModal({ onClose, onPostCreated }: NewPostModalProps) {
+  const { showToast } = useToast();
   const [postText, setPostText] = useState("");
-  const [location, setLocation] = useState("");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -21,10 +24,70 @@ export default function NewPostModal({ onClose }: NewPostModalProps) {
   }, []);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setFileName(f.name);
-    setPreview(URL.createObjectURL(f));
+    const files = Array.from(e.target.files || []);
+    if (files.length + mediaFiles.length > 5) {
+      showToast("Maximum 5 media files allowed", "error");
+      return;
+    }
+
+    const newFiles = [...mediaFiles, ...files];
+    setMediaFiles(newFiles);
+
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setMediaPreviews([...mediaPreviews, ...newPreviews]);
+  };
+
+  const removeMedia = (index: number) => {
+    URL.revokeObjectURL(mediaPreviews[index]);
+    setMediaFiles(mediaFiles.filter((_, i) => i !== index));
+    setMediaPreviews(mediaPreviews.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
+    if (!postText.trim()) {
+      showToast("Please write something", "error");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let mediaUrls: string[] = [];
+
+      if (mediaFiles.length > 0) {
+        const uploadRes = await api.posts.uploadMedia(mediaFiles);
+        if (uploadRes.success) {
+          mediaUrls = uploadRes.data.mediaUrls;
+        } else {
+          showToast("Failed to upload media", "error");
+          setLoading(false);
+          return;
+        }
+      }
+
+      const postType = mediaUrls.length > 0 
+        ? (mediaFiles.some(f => f.type.startsWith('video/')) ? 'VIDEO' : 'IMAGE')
+        : 'TEXT';
+
+      const res = await api.posts.create({
+        content: postText.trim(),
+        postType,
+        mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+      });
+
+      if (res.success) {
+        showToast("Post created successfully!", "success");
+        mediaPreviews.forEach(url => URL.revokeObjectURL(url));
+        onPostCreated();
+        onClose();
+      } else {
+        showToast(res.message || "Failed to create post", "error");
+      }
+    } catch (error) {
+      showToast("Error creating post", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inputStyle: React.CSSProperties = {
@@ -87,81 +150,86 @@ export default function NewPostModal({ onClose }: NewPostModalProps) {
         {/* Body */}
         <div style={{ padding: "16px 20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "14px" }}>
 
-          {/* Post Type */}
-          <div>
-            <label style={labelStyle}>Post Type</label>
-            <div style={{ position: "relative" }}>
-              <select
-                value={postType}
-                onChange={(e) => setPostType(e.target.value)}
-                style={{ ...inputStyle, padding: "10px 16px", appearance: "none", cursor: "pointer" }}
-              >
-                <option>General Discussion</option>
-                <option>Team Update</option>
-                <option>Achievement</option>
-                <option>Question</option>
-              </select>
-              <div style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#FFFFFF" }}>▾</div>
-            </div>
-          </div>
-
           {/* Your Post textarea */}
           <div>
             <label style={labelStyle}>Your Post</label>
             <textarea
               value={postText}
               onChange={(e) => setPostText(e.target.value)}
-              placeholder="Sharing something with the owners club"
-              rows={3}
-              style={{ ...inputStyle, padding: "10px 16px", resize: "none", lineHeight: "1.6" }}
+              placeholder="Share something with the owners club..."
+              rows={5}
+              disabled={loading}
+              style={{ ...inputStyle, padding: "10px 16px", resize: "vertical", lineHeight: "1.6" }}
             />
           </div>
 
+          {/* Media Previews */}
+          {mediaPreviews.length > 0 && (
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {mediaPreviews.map((preview, index) => (
+                <div key={index} style={{ position: "relative", width: "100px", height: "100px" }}>
+                  {mediaFiles[index].type.startsWith('image/') ? (
+                    <img src={preview} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "5px" }} />
+                  ) : (
+                    <video src={preview} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "5px" }} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeMedia(index)}
+                    disabled={loading}
+                    style={{
+                      position: "absolute",
+                      top: "4px",
+                      right: "4px",
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(0,0,0,0.7)",
+                      color: "#fff",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Upload */}
           <div>
-            <label style={labelStyle}>Your Post</label>
+            <label style={labelStyle}>Add Media (Optional)</label>
             <div
-              onClick={() => fileRef.current?.click()}
+              onClick={() => !loading && mediaFiles.length < 5 && fileRef.current?.click()}
               style={{
                 ...inputStyle,
                 padding: "20px 16px",
                 display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center",
-                gap: "8px", cursor: "pointer", overflow: "hidden",
+                gap: "8px", cursor: loading || mediaFiles.length >= 5 ? "not-allowed" : "pointer",
+                opacity: loading || mediaFiles.length >= 5 ? 0.5 : 1,
               }}
             >
-              {preview ? (
-                <>
-                  <img src={preview} alt="preview" style={{ maxWidth: "100%", maxHeight: "120px", borderRadius: "4px", objectFit: "contain" }} />
-                  <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>{fileName}</span>
-                </>
-              ) : (
-                <>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8C96A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                  <span style={{ color: "#FFFFFF", fontSize: "13px" }}>Click or drag to upload</span>
-                </>
-              )}
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8C96A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              <span style={{ color: "#FFFFFF", fontSize: "13px" }}>
+                {mediaFiles.length >= 5 ? "Maximum 5 files" : "Click to upload images/videos"}
+              </span>
             </div>
-            <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={handleFile} />
-          </div>
-
-          {/* Tag Location */}
-          <div>
-            <label style={labelStyle}>Tag Location</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="eg. Pebble Beach, north side"
-              style={{ ...inputStyle, padding: "10px 16px" }}
-            />
+            <input ref={fileRef} type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={handleFile} disabled={loading} />
           </div>
 
           {/* Submit */}
           <button
+            onClick={handleSubmit}
+            disabled={loading || !postText.trim()}
             style={{
               width: "100%",
               backgroundColor: "#E8C96A",
@@ -172,10 +240,11 @@ export default function NewPostModal({ onClose }: NewPostModalProps) {
               fontSize: "16px",
               fontWeight: 500,
               fontFamily: "var(--font-poppins), sans-serif",
-              cursor: "pointer",
+              cursor: loading || !postText.trim() ? "not-allowed" : "pointer",
+              opacity: loading || !postText.trim() ? 0.5 : 1,
             }}
           >
-            Publish to Club
+            {loading ? "Publishing..." : "Publish to Club"}
           </button>
 
         </div>

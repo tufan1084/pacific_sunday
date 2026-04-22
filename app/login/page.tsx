@@ -170,13 +170,14 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: "20px" }}>
-            <label style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px", display: "block", marginBottom: "8px" }}>Email</label>
+            <label style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px", display: "block", marginBottom: "8px" }}>Username or Email</label>
             <input
-              type="email"
+              type="text"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               required
               style={inputStyle}
+              placeholder="Enter username or email"
             />
           </div>
 
@@ -276,17 +277,18 @@ export default function LoginPage() {
             {forgotStep === "email" && (
               <form onSubmit={handleRequestOtp}>
                 <p style={{ color: "#94A3B8", fontSize: "14px", marginBottom: "20px" }}>
-                  Enter your email and we&apos;ll send you a 6-digit verification code.
+                  Enter your username or email and we&apos;ll send you a 6-digit verification code.
                 </p>
                 <div style={{ marginBottom: "20px" }}>
-                  <label style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px", display: "block", marginBottom: "8px" }}>Email</label>
+                  <label style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px", display: "block", marginBottom: "8px" }}>Username or Email</label>
                   <input
-                    type="email"
+                    type="text"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     required
                     autoFocus
                     style={inputStyle}
+                    placeholder="Enter username or email"
                   />
                 </div>
                 {forgotError && (

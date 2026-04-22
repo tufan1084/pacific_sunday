@@ -43,6 +43,7 @@ export default function NFCEntryPage({
   const [formError, setFormError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [generatedUsername, setGeneratedUsername] = useState("");
 
   // Register form
   const [name, setName] = useState("");
@@ -193,6 +194,9 @@ export default function NFCEntryPage({
     const res = await register({ name, email, password, bagUid, country });
 
     if (res.success) {
+      if (res.data?.user?.username) {
+        setGeneratedUsername(res.data.user.username);
+      }
       router.push("/profile");
     } else {
       setFormError(res.message || "Registration failed.");
@@ -544,6 +548,19 @@ export default function NFCEntryPage({
               >
                 Create Account & Link Bag
               </button>
+
+              {/* Username info */}
+              <div className="rounded-md" style={{ backgroundColor: "rgba(232, 201, 106, 0.05)", padding: "12px", border: "1px solid rgba(232, 201, 106, 0.1)", marginTop: "16px" }}>
+                <div className="flex items-start gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8C96A" strokeWidth="2" strokeLinecap="round" className="mt-0.5 shrink-0">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                  <p className="text-xs" style={{ color: "#94A3B8", fontFamily: "var(--font-poppins), sans-serif", lineHeight: "1.5" }}>
+                    A unique username will be generated for you based on your name after registration.
+                  </p>
+                </div>
+              </div>
             </form>
           </div>
         )}

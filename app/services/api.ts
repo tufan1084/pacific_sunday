@@ -133,4 +133,36 @@ export const api = {
       return await response.json();
     },
   },
+
+  posts: {
+    getAll: (limit?: number, offset?: number) => {
+      const params = new URLSearchParams();
+      if (limit) params.set('limit', limit.toString());
+      if (offset) params.set('offset', offset.toString());
+      return fetchApi(`/posts?${params.toString()}`);
+    },
+    create: (data: { content: string; postType?: string; mediaUrls?: string[] }) =>
+      fetchApi("/posts", { method: "POST", body: JSON.stringify(data) }),
+    uploadMedia: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach(file => formData.append('media', file));
+
+      const token = typeof window !== "undefined" ? localStorage.getItem("ps_token") : null;
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/posts/upload-media`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+      return await response.json();
+    },
+    like: (postId: number) => fetchApi(`/posts/${postId}/like`, { method: "POST" }),
+    addComment: (postId: number, content: string) =>
+      fetchApi(`/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ content }) }),
+    getComments: (postId: number) => fetchApi(`/posts/${postId}/comments`),
+  },
 };

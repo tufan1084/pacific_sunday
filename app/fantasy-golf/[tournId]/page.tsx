@@ -401,7 +401,7 @@ export default function TournamentPicksPage() {
           `}</style>
         </div>
       ) : tiers.length > 0 ? (
-        isLocked || selectedCount > 0 ? (
+        isLocked ? (
           <LockedPicksTable tiers={tiers} picks={picks} />
         ) : (
           <TierPlayerList
@@ -433,7 +433,7 @@ export default function TournamentPicksPage() {
 
       {tiers.length > 0 && !isLocked && !picksLoading && (
         <div style={{ marginTop: "clamp(16px, 3vw, 20px)", display: "flex", flexDirection: "column", gap: "clamp(8px, 1.5vw, 10px)" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "clamp(8px, 1.5vw, 10px)" }} className="sm:flex-row">
+          <div className="flex flex-col sm:flex-row" style={{ gap: "clamp(8px, 1.5vw, 10px)" }}>
             <button
               onClick={handleSave}
               disabled={isLocked || selectedCount === 0 || busy}
@@ -460,19 +460,44 @@ export default function TournamentPicksPage() {
               style={{
                 flex: 1,
                 height: "clamp(44px, 6vw, 52px)",
-                backgroundColor: isLocked ? "rgba(255,255,255,0.06)" : selectedCount < totalPicks ? "rgba(232,201,106,0.3)" : "#E8C96A",
-                color: isLocked ? "rgba(255,255,255,0.25)" : selectedCount < totalPicks ? "rgba(6,13,31,0.5)" : "#060D1F",
+                backgroundColor:
+                  isLocked
+                    ? "rgba(255,255,255,0.06)"
+                    : selectedCount < totalPicks
+                    ? "transparent"
+                    : "#E8C96A",
+                color:
+                  isLocked
+                    ? "rgba(255,255,255,0.25)"
+                    : selectedCount < totalPicks
+                    ? "rgba(232,201,106,0.7)"
+                    : "#060D1F",
                 fontSize: "clamp(13px, 1.8vw, 14px)",
                 fontWeight: 600,
                 fontFamily: "var(--font-poppins), sans-serif",
-                border: "none",
+                border:
+                  isLocked
+                    ? "1.5px solid rgba(255,255,255,0.08)"
+                    : selectedCount < totalPicks
+                    ? "1.5px dashed rgba(232,201,106,0.5)"
+                    : "1.5px solid #E8C96A",
                 borderRadius: "5px",
                 cursor: isLocked || selectedCount < totalPicks || busy ? "not-allowed" : "pointer",
                 opacity: busy ? 0.6 : 1,
+                boxShadow:
+                  !isLocked && selectedCount === totalPicks && !busy
+                    ? "0 4px 14px rgba(232,201,106,0.35)"
+                    : "none",
                 transition: "all 0.2s ease",
               }}
             >
-              {busy ? "Working..." : isLocked ? "Picks Locked" : `Lock Picks (${selectedCount}/${totalPicks})`}
+              {busy
+                ? "Working..."
+                : isLocked
+                ? "Picks Locked"
+                : selectedCount < totalPicks
+                ? `Pick ${totalPicks - selectedCount} more to Lock (${selectedCount}/${totalPicks})`
+                : `Lock Picks (${selectedCount}/${totalPicks})`}
             </button>
           </div>
 

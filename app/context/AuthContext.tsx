@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (res.success && res.data) {
       const data = res.data as { token: string; user: User };
       localStorage.setItem("ps_token", data.token);
+      localStorage.setItem("ps_user_id", data.user.id.toString());
       setUser(data.user);
     }
     return { success: res.success, message: res.message };
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (res.success && res.data) {
       const data = res.data as { token: string; user: User };
       localStorage.setItem("ps_token", data.token);
+      localStorage.setItem("ps_user_id", data.user.id.toString());
       setUser(data.user);
     }
     return { success: res.success, message: res.message };
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("ps_token");
+    localStorage.removeItem("ps_user_id");
     setUser(null);
   };
 
