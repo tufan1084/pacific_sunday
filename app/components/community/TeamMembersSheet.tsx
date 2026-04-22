@@ -551,6 +551,8 @@ export default function TeamMembersSheet({ team, onClose, onJoin, onLeave, refre
       {/* Confirmation Dialog */}
       {confirmAction && (
         <ConfirmDialog
+          isOpen={true}
+          onClose={() => setConfirmAction(null)}
           title={
             confirmAction.type === "delete" 
               ? "Delete Team" 
@@ -577,7 +579,6 @@ export default function TeamMembersSheet({ team, onClose, onJoin, onLeave, refre
               handleRemove(confirmAction.memberId);
             }
           }}
-          onCancel={() => setConfirmAction(null)}
         />
       )}
     </div>

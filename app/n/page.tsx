@@ -194,8 +194,8 @@ export default function NFCEntryPage({
     const res = await register({ name, email, password, bagUid, country });
 
     if (res.success) {
-      if (res.data?.user?.username) {
-        setGeneratedUsername(res.data.user.username);
+      if ((res as any).data?.user?.username) {
+        setGeneratedUsername((res as any).data.user.username);
       }
       router.push("/profile");
     } else {
