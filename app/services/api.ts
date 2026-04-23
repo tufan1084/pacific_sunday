@@ -181,6 +181,8 @@ export const api = {
       fetchApi(`/posts/${postId}`, { method: "DELETE" }),
     share: (postId: number) =>
       fetchApi<{ postId: number; shareCount: number }>(`/posts/${postId}/share`, { method: "POST" }),
+    report: (postId: number, reason: string, details?: string) =>
+      fetchApi(`/posts/${postId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) }),
   },
 
   teams: {
@@ -223,6 +225,57 @@ export const api = {
     removeMember: (teamId: number, memberId: number) =>
       fetchApi(`/teams/${teamId}/members/${memberId}`, { method: "DELETE" }),
   },
+
+  notifications: {
+    list: (cursor?: number, limit?: number) => {
+      const params = new URLSearchParams();
+      if (cursor) params.set("cursor", cursor.toString());
+      if (limit) params.set("limit", limit.toString());
+      const qs = params.toString();
+      return fetchApi<{
+        notifications: ApiNotification[];
+        nextCursor: number | null;
+        unreadCount: number;
+      }>(`/notifications${qs ? `?${qs}` : ""}`);
+    },
+    unreadCount: () => fetchApi<{ count: number }>("/notifications/unread-count"),
+    markRead: (id: number) =>
+      fetchApi(`/notifications/${id}/read`, { method: "POST" }),
+    markAllRead: () =>
+      fetchApi("/notifications/read-all", { method: "POST" }),
+  },
+
+  follows: {
+    follow: (userId: number) =>
+      fetchApi<{ isFollowing: boolean }>(`/users/${userId}/follow`, { method: "POST" }),
+    unfollow: (userId: number) =>
+      fetchApi<{ isFollowing: boolean }>(`/users/${userId}/follow`, { method: "DELETE" }),
+    getFollowers: (userId: number) =>
+      fetchApi<{ users: { id: number; username: string; name: string }[] }>(
+        `/users/${userId}/followers`
+      ),
+    getFollowing: (userId: number) =>
+      fetchApi<{ users: { id: number; username: string; name: string }[] }>(
+        `/users/${userId}/following`
+      ),
+    getUserProfile: (userId: number) =>
+      fetchApi<{ user: ApiUserProfile }>(`/users/${userId}`),
+  },
+
+  search: {
+    all: (q: string) =>
+      fetchApi<{ users: ApiSearchUser[]; teams: ApiTeam[] }>(
+        `/search?q=${encodeURIComponent(q)}`
+      ),
+    users: (q: string) =>
+      fetchApi<{ users: ApiSearchUser[]; teams: ApiTeam[] }>(
+        `/search?type=users&q=${encodeURIComponent(q)}`
+      ),
+    teams: (q: string) =>
+      fetchApi<{ users: ApiSearchUser[]; teams: ApiTeam[] }>(
+        `/search?type=teams&q=${encodeURIComponent(q)}`
+      ),
+  },
 };
 
 export interface ApiTeam {
@@ -238,6 +291,8 @@ export interface ApiTeam {
 }
 
 export interface ApiTeamDetail extends ApiTeam {
+  isPreview?: boolean;
+  hasPendingRequest?: boolean;
   members: {
     id: number;
     username: string;
@@ -263,4 +318,48 @@ export interface ApiTeamInvite {
   teamPrivacy: "public" | "private";
   invitedBy: number;
   createdAt: string;
+}
+
+export type NotificationType =
+  | "POST_LIKED"
+  | "POST_COMMENTED"
+  | "COMMENT_REPLIED"
+  | "USER_FOLLOWED"
+  | "TEAM_INVITED"
+  | "TEAM_JOIN_REQUEST"
+  | "TEAM_JOIN_APPROVED"
+  | "TEAM_JOIN_REJECTED"
+  | "TEAM_ROLE_CHANGED"
+  | "TEAM_REMOVED";
+
+export interface ApiNotification {
+  id: number;
+  type: NotificationType;
+  actorId: number | null;
+  actor: { id: number; username: string; name: string } | null;
+  entityType: string | null;
+  entityId: number | null;
+  teamId: number | null;
+  data: Record<string, any> | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface ApiSearchUser {
+  id: number;
+  username: string;
+  name: string;
+}
+
+export interface ApiUserProfile {
+  id: number;
+  username: string;
+  name: string;
+  country: string | null;
+  createdAt: string;
+  followerCount: number;
+  followingCount: number;
+  postCount: number;
+  isFollowing: boolean;
+  isSelf: boolean;
 }

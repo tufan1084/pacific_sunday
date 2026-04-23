@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/app/services/api";
-import { API_BASE_URL, SOCKET_URL } from "@/app/lib/constants";
+import { SOCKET_URL, resolveMediaUrl } from "@/app/lib/constants";
 import { io, Socket } from "socket.io-client";
 import { IoIosAttach, IoMdSend } from "react-icons/io";
 import { FiShare2 } from "react-icons/fi";
@@ -57,6 +57,7 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
   const author = post.user?.profile?.name || post.user?.username || "Unknown";
   const username = post.user?.username;
   const initials = author.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+  const authorPhoto = post.user?.profile?.golfPassport?.photoUrl || null;
   const timeAgo = getTimeAgo(post.createdAt);
   const mediaUrls = post.mediaUrls ? (Array.isArray(post.mediaUrls) ? post.mediaUrls : []) : [];
   const computedTags: string[] = Array.isArray(post._computedTags) ? post._computedTags : [];
@@ -284,20 +285,33 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
     >
       <div className="flex items-start gap-3">
         <div
+          onClick={() => { if (!isPublicView && postUserId && router) router.push(`/user/${postUserId}`); }}
           style={{
             width: "38px", height: "38px", borderRadius: "5px",
             backgroundColor: "#060D1F", display: "flex", alignItems: "center",
             justifyContent: "center", fontSize: "10px", fontWeight: 700,
             color: "#E8C96A", flexShrink: 0,
+            cursor: !isPublicView && postUserId ? "pointer" : "default",
+            overflow: "hidden",
           }}
         >
-          {initials}
+          {authorPhoto ? (
+            <img src={resolveMediaUrl(authorPhoto)} alt={author} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            initials
+          )}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="flex items-start justify-between gap-2" style={{ marginBottom: "8px" }}>
             <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5" style={{ minWidth: 0, flex: 1 }}>
-              <span style={{ color: "#E8C96A", fontWeight: 500, fontSize: "clamp(14px, 1.5vw, 16px)" }}>
+              <span
+                onClick={() => { if (!isPublicView && postUserId && router) router.push(`/user/${postUserId}`); }}
+                style={{
+                  color: "#E8C96A", fontWeight: 500, fontSize: "clamp(14px, 1.5vw, 16px)",
+                  cursor: !isPublicView && postUserId ? "pointer" : "default",
+                }}
+              >
                 {author}
               </span>
               {username && (
@@ -357,8 +371,8 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
           {mediaUrls.length > 0 && (
             <div style={{ marginBottom: "16px", display: "grid", gridTemplateColumns: mediaUrls.length === 1 ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px" }}>
               {mediaUrls.map((url: string, idx: number) => {
-                const isVideo = url.includes("/video/");
-                const fullUrl = `${API_BASE_URL}${url}`;
+                const isVideo = /\.(mp4|mov|avi|mkv|webm)(\?|$)/i.test(url) || url.includes("/video/");
+                const fullUrl = resolveMediaUrl(url);
                 return (
                   <div key={idx} style={{ position: "relative", borderRadius: "5px", overflow: "hidden" }}>
                     {isVideo ? (
@@ -445,8 +459,12 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
           ) : comments.map((comment) => (
             <div key={comment.id} style={{ marginBottom: "10px" }}>
               <div className="flex items-start gap-2">
-                <div style={{ width: "24px", height: "24px", borderRadius: "4px", backgroundColor: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 700, color: "#E8C96A", flexShrink: 0 }}>
-                  {(comment.user?.profile?.name || comment.user?.username || "U").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                <div style={{ width: "24px", height: "24px", borderRadius: "4px", backgroundColor: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 700, color: "#E8C96A", flexShrink: 0, overflow: "hidden" }}>
+                  {comment.user?.profile?.golfPassport?.photoUrl ? (
+                    <img src={resolveMediaUrl(comment.user.profile.golfPassport.photoUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    (comment.user?.profile?.name || comment.user?.username || "U").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ marginBottom: "2px" }}>
@@ -481,8 +499,12 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
                       {comment.replies.map((reply: any) => (
                         <div key={reply.id} style={{ marginBottom: "8px" }}>
                           <div className="flex items-start gap-2">
-                            <div style={{ width: "20px", height: "20px", borderRadius: "4px", backgroundColor: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: 700, color: "#E8C96A", flexShrink: 0 }}>
-                              {(reply.user?.profile?.name || reply.user?.username || "U").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                            <div style={{ width: "20px", height: "20px", borderRadius: "4px", backgroundColor: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: 700, color: "#E8C96A", flexShrink: 0, overflow: "hidden" }}>
+                              {reply.user?.profile?.golfPassport?.photoUrl ? (
+                                <img src={resolveMediaUrl(reply.user.profile.golfPassport.photoUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              ) : (
+                                (reply.user?.profile?.name || reply.user?.username || "U").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+                              )}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ marginBottom: "2px" }}>

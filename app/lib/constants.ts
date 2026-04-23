@@ -13,6 +13,14 @@ export const SOCKET_URL = (() => {
   }
 })();
 
+// Resolve image URLs from the backend. S3-hosted uploads return absolute URLs;
+// legacy uploads stored as "/uploads/..." need the backend origin prepended.
+export const resolveMediaUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${SOCKET_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 export const NAV_ITEMS: NavItem[] = [
   { icon: "dashboard", label: "Dashboard", href: "/", isActive: true },
   { icon: "fantasy", label: "Fantasy Golf", href: "/fantasy-golf" },

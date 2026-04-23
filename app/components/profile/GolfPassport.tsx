@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { api } from "@/app/services/api";
+import { resolveMediaUrl } from "@/app/lib/constants";
 import { getData } from "country-list";
 import { useToast } from "@/app/context/ToastContext";
 
@@ -68,7 +69,7 @@ export default function GolfPassport({ profileData, golfPassport, onUpdate }: Go
       });
       if (golfPassport.photoUrl) {
         setPhoto(golfPassport.photoUrl);
-        setPhotoPreview(`http://localhost:5000${golfPassport.photoUrl}`);
+        setPhotoPreview(resolveMediaUrl(golfPassport.photoUrl));
       }
     } else {
       setForm({
@@ -117,6 +118,9 @@ export default function GolfPassport({ profileData, golfPassport, onUpdate }: Go
       const response = await api.profile.uploadPhoto(file);
       if (response.success && response.data?.photoUrl) {
         setPhoto(response.data.photoUrl);
+        setPhotoPreview(resolveMediaUrl(response.data.photoUrl));
+        showToast("Profile photo updated", "success");
+        if (onUpdate) onUpdate();
       } else {
         showToast("Failed to upload photo", "error");
         setPhoto(null);

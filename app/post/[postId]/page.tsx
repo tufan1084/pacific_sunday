@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { API_BASE_URL } from "@/app/lib/constants";
+import { resolveMediaUrl } from "@/app/lib/constants";
 import { BsPinAngleFill } from "react-icons/bs";
 
 export default function PublicPostPage() {
@@ -207,8 +207,8 @@ export default function PublicPostPage() {
               {mediaUrls.length > 0 && (
                 <div style={{ marginBottom: "16px", display: "grid", gridTemplateColumns: mediaUrls.length === 1 ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px" }}>
                   {mediaUrls.map((url: string, idx: number) => {
-                    const isVideo = url.includes("/video/");
-                    const fullUrl = `${API_BASE_URL}${url}`;
+                    const isVideo = /\.(mp4|mov|avi|mkv|webm)(\?|$)/i.test(url) || url.includes("/video/");
+                    const fullUrl = resolveMediaUrl(url);
                     return (
                       <div key={idx} style={{ position: "relative", borderRadius: "5px", overflow: "hidden" }}>
                         {isVideo ? (

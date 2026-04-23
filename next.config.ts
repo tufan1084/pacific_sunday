@@ -25,6 +25,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'files.iyk.app',
       },
+      {
+        protocol: 'https',
+        hostname: '*.s3.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.s3.*.amazonaws.com',
+      },
     ],
   },
   async headers() {

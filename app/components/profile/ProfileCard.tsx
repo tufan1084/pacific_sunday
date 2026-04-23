@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PROFILE_USER } from "@/app/lib/profile-data";
+import { resolveMediaUrl } from "@/app/lib/constants";
 import { getCode } from "country-list";
 
 interface ProfileCardProps {
@@ -52,10 +53,9 @@ export default function ProfileCard({ profileData, golfPassport }: ProfileCardPr
         <div style={{ width: "50px", height: "50px", borderRadius: "3px", border: "1.5px solid #E8C96A", backgroundColor: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
           {profilePhoto ? (
             <img
-              src={`http://localhost:5000${profilePhoto}`}
+              src={resolveMediaUrl(profilePhoto)}
               alt={name}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              crossOrigin="anonymous"
               onError={() => setPhotoError(true)}
             />
           ) : (

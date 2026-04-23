@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { api } from "@/app/services/api";
+import { resolveMediaUrl } from "@/app/lib/constants";
 import { useToast } from "@/app/context/ToastContext";
 import { IoImageOutline, IoVideocamOutline, IoClose, IoChevronDown, IoEarthOutline, IoLockClosedOutline, IoPeopleOutline } from "react-icons/io5";
 import type { Team } from "@/app/types/community";
@@ -27,6 +28,17 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
 
   const currentUser = typeof window !== "undefined" ? localStorage.getItem("ps_username") || "You" : "You";
   const initials = currentUser.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) || "YO";
+  const [myPhoto, setMyPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.profile.getGolfPassport().then((res: any) => {
+      if (!cancelled && res?.success) {
+        setMyPhoto(res?.data?.golfPassport?.photoUrl || null);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (expanded && textareaRef.current) {
@@ -123,7 +135,7 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
           backgroundColor: "#13192A",
           borderRadius: "8px",
           padding: "12px 14px",
-          marginBottom: "16px",
+          marginBottom: "10px",
           fontFamily: "var(--font-poppins), sans-serif",
         }}
       >
@@ -133,10 +145,14 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
               width: "38px", height: "38px", borderRadius: "5px",
               backgroundColor: "#060D1F", display: "flex", alignItems: "center",
               justifyContent: "center", fontSize: "12px", fontWeight: 700,
-              color: "#E8C96A", flexShrink: 0,
+              color: "#E8C96A", flexShrink: 0, overflow: "hidden",
             }}
           >
-            {initials}
+            {myPhoto ? (
+              <img src={resolveMediaUrl(myPhoto)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              initials
+            )}
           </div>
           <button
             onClick={() => setExpanded(true)}
@@ -193,10 +209,14 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
               width: "38px", height: "38px", borderRadius: "5px",
               backgroundColor: "#060D1F", display: "flex", alignItems: "center",
               justifyContent: "center", fontSize: "12px", fontWeight: 700,
-              color: "#E8C96A", flexShrink: 0,
+              color: "#E8C96A", flexShrink: 0, overflow: "hidden",
             }}
           >
-            {initials}
+            {myPhoto ? (
+              <img src={resolveMediaUrl(myPhoto)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              initials
+            )}
           </div>
           <div>
             <div style={{ color: "#E8C96A", fontSize: "14px", fontWeight: 500 }}>

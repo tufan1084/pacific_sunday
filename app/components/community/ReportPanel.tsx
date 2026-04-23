@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { IoClose } from "react-icons/io5";
 import { useToast } from "@/app/context/ToastContext";
+import { api } from "@/app/services/api";
 
 interface ReportPanelProps {
   postId: number;
@@ -32,11 +33,16 @@ export default function ReportPanel({ postId, onClose, onReported }: ReportPanel
     }
     setSubmitting(true);
     try {
-      // Backend endpoint not yet implemented — optimistic UI
-      await new Promise(r => setTimeout(r, 400));
-      showToast("Report submitted. Thanks for keeping the community safe.", "success");
-      onReported();
-      onClose();
+      const res = await api.posts.report(postId, reason, reason === "other" ? details : undefined);
+      if (res.success) {
+        showToast("Report submitted. Thanks for keeping the community safe.", "success");
+        onReported();
+        onClose();
+      } else {
+        showToast(res.message || "Failed to submit report", "error");
+      }
+    } catch {
+      showToast("Failed to submit report", "error");
     } finally {
       setSubmitting(false);
     }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
+import { IoPeopleOutline } from "react-icons/io5";
 import CommunityHeader from "@/app/components/community/CommunityHeader";
 import CommunityFilters from "@/app/components/community/CommunityFilters";
 import CreatePostInline from "@/app/components/community/CreatePostInline";
@@ -11,6 +13,8 @@ import CommunityStatus from "@/app/components/community/CommunityStatus";
 import TeamPanel from "@/app/components/community/TeamPanel";
 import TeamMembersSheet from "@/app/components/community/TeamMembersSheet";
 import AddTeamPanel from "@/app/components/community/AddTeamPanel";
+import MobileTeamSheet from "@/app/components/community/MobileTeamSheet";
+import GlobalSearchBar from "@/app/components/layout/GlobalSearchBar";
 import { COMMUNITY_STATS, TAG_KEYWORDS } from "@/app/lib/community-data";
 import { api } from "@/app/services/api";
 import { SOCKET_URL } from "@/app/lib/constants";
@@ -30,10 +34,13 @@ function detectPostTags(post: any): string[] {
 }
 
 export default function CommunityPage() {
+  const searchParams = useSearchParams();
+  const initialTeam = searchParams?.get("team") || ALL_OWNERS;
+
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [activeFilter, setActiveFilter] = useState<string>(ALL_OWNERS);
+  const [activeFilter, setActiveFilter] = useState<string>(initialTeam);
   const [activeTab, setActiveTab] = useState<string>("All Post");
 
   const [showAddTeam, setShowAddTeam] = useState(false);
@@ -43,6 +50,42 @@ export default function CommunityPage() {
 
   const [hiddenPostIds, setHiddenPostIds] = useState<number[]>([]);
   const [hiddenUserIds, setHiddenUserIds] = useState<number[]>([]);
+
+  const [isLg, setIsLg] = useState(true);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+
+  const [topVisible, setTopVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    setIsLg(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    const scroller = document.querySelector<HTMLElement>("main");
+    if (!scroller) return;
+
+    const onScroll = () => {
+      const y = scroller.scrollTop;
+      const diff = y - lastScrollYRef.current;
+
+      if (y <= 8) {
+        setTopVisible(true);
+      } else if (diff > 6) {
+        setTopVisible(false);
+      } else if (diff < -6) {
+        setTopVisible(true);
+      }
+      lastScrollYRef.current = y;
+    };
+
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, []);
 
   const toast = useToast();
 
@@ -283,34 +326,68 @@ export default function CommunityPage() {
     }
   };
 
+  const leftStickyStyle: React.CSSProperties = {
+    position: "sticky",
+    top: "-20px",
+    zIndex: 20,
+    backgroundColor: "#060D1F",
+    marginTop: "-20px",
+    paddingTop: "20px",
+    // On mobile, full-bleed into main's 20px side padding so the sticky bg covers edge-to-edge
+    ...(isLg
+      ? {}
+      : {
+          marginLeft: "-20px",
+          marginRight: "-20px",
+          paddingLeft: "20px",
+          paddingRight: "20px",
+        }),
+    transform: !isLg && !topVisible ? "translateY(-105%)" : "translateY(0)",
+    transition: isLg ? "none" : "transform 0.28s ease",
+    willChange: isLg ? "auto" : "transform",
+  };
+
+  const rightStickyStyle: React.CSSProperties = {
+    position: "sticky",
+    top: "-20px",
+    zIndex: 20,
+    backgroundColor: "#060D1F",
+    marginTop: "-20px",
+    paddingTop: "20px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  };
+
   return (
     <>
-      <CommunityHeader />
+      <div className="lg:grid lg:grid-cols-[3fr_2fr] lg:gap-4">
+        {/* LEFT COLUMN: header + filters + create post (sticky), then add-team panel and posts */}
+        <div style={{ minWidth: 0 }}>
+          <div style={leftStickyStyle}>
+            <CommunityHeader />
+            <CommunityFilters
+              teams={teams}
+              activeFilter={activeFilter}
+              activeTab={activeTab}
+              onFilterChange={(f) => { setActiveFilter(f); setShowMembersSheet(false); }}
+              onTabChange={setActiveTab}
+              onAddTeam={() => setShowAddTeam(true)}
+            />
+            <CreatePostInline
+              onPostCreated={() => fetchPosts(activeTeam?.id)}
+              activeTeam={activeTeam}
+              userTeams={teams.filter(t => t.isMember)}
+              onTeamChange={(name) => setActiveFilter(name)}
+            />
+          </div>
 
-      <CommunityFilters
-        teams={teams}
-        activeFilter={activeFilter}
-        activeTab={activeTab}
-        onFilterChange={(f) => { setActiveFilter(f); setShowMembersSheet(false); }}
-        onTabChange={setActiveTab}
-        onAddTeam={() => setShowAddTeam(true)}
-      />
-
-      {showAddTeam && (
-        <AddTeamPanel
-          onClose={() => setShowAddTeam(false)}
-          onCreated={handleTeamCreated}
-        />
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-start">
-        <div>
-          <CreatePostInline
-            onPostCreated={() => fetchPosts(activeTeam?.id)}
-            activeTeam={activeTeam}
-            userTeams={teams.filter(t => t.isMember)}
-            onTeamChange={(name) => setActiveFilter(name)}
-          />
+          {showAddTeam && (
+            <AddTeamPanel
+              onClose={() => setShowAddTeam(false)}
+              onCreated={handleTeamCreated}
+            />
+          )}
 
           {loading ? (
             <div style={{ textAlign: "center", padding: "40px", color: "#94A3B8" }}>
@@ -355,28 +432,82 @@ export default function CommunityPage() {
           )}
         </div>
 
-        <div className="flex flex-col gap-4">
-          {showMembersSheet && activeTeam ? (
-            <TeamMembersSheet
-              team={activeTeam}
-              onClose={() => { setShowMembersSheet(false); setMembersSheetView("members"); }}
-              onJoin={handleJoin}
-              onLeave={handleLeave}
-              refreshToken={membersRefreshToken}
-              initialView={membersSheetView}
-            />
-          ) : (
-            <TeamPanel
-              activeTeam={activeTeam}
-              onViewAll={(view) => { setMembersSheetView(view || "members"); setShowMembersSheet(true); }}
-              onJoin={handleJoin}
-              onLeave={handleLeave}
-              refreshToken={membersRefreshToken}
-            />
-          )}
-          <CommunityStatus stats={COMMUNITY_STATS} />
-        </div>
+        {/* RIGHT COLUMN: search + sidebar + status (all sticky). Desktop only. */}
+        {isLg && (
+          <div style={{ minWidth: 0 }}>
+            <div style={rightStickyStyle}>
+              <GlobalSearchBar />
+              {showMembersSheet && activeTeam ? (
+                <TeamMembersSheet
+                  team={activeTeam}
+                  onClose={() => { setShowMembersSheet(false); setMembersSheetView("members"); }}
+                  onJoin={handleJoin}
+                  onLeave={handleLeave}
+                  refreshToken={membersRefreshToken}
+                  initialView={membersSheetView}
+                />
+              ) : (
+                <TeamPanel
+                  activeTeam={activeTeam}
+                  onViewAll={(view) => { setMembersSheetView(view || "members"); setShowMembersSheet(true); }}
+                  onJoin={handleJoin}
+                  onLeave={handleLeave}
+                  refreshToken={membersRefreshToken}
+                />
+              )}
+              <CommunityStatus stats={COMMUNITY_STATS} />
+            </div>
+          </div>
+        )}
       </div>
+
+      {!isLg && (
+        <>
+          <button
+            onClick={() => setMobileSheetOpen(true)}
+            aria-label="Team info and community stats"
+            className="lg:hidden flex items-center justify-center"
+            style={{
+              position: "fixed",
+              right: "16px",
+              bottom: "20px",
+              width: "52px",
+              height: "52px",
+              borderRadius: "999px",
+              backgroundColor: "#E8C96A",
+              color: "#060D1F",
+              border: "none",
+              cursor: "pointer",
+              zIndex: 40,
+              boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
+            }}
+          >
+            <IoPeopleOutline size={22} />
+          </button>
+
+          <MobileTeamSheet open={mobileSheetOpen} onClose={() => setMobileSheetOpen(false)}>
+            {showMembersSheet && activeTeam ? (
+              <TeamMembersSheet
+                team={activeTeam}
+                onClose={() => { setShowMembersSheet(false); setMembersSheetView("members"); }}
+                onJoin={handleJoin}
+                onLeave={handleLeave}
+                refreshToken={membersRefreshToken}
+                initialView={membersSheetView}
+              />
+            ) : (
+              <TeamPanel
+                activeTeam={activeTeam}
+                onViewAll={(view) => { setMembersSheetView(view || "members"); setShowMembersSheet(true); }}
+                onJoin={handleJoin}
+                onLeave={handleLeave}
+                refreshToken={membersRefreshToken}
+              />
+            )}
+            <CommunityStatus stats={COMMUNITY_STATS} />
+          </MobileTeamSheet>
+        </>
+      )}
     </>
   );
 }

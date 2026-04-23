@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { api } from "@/app/services/api";
+import { resolveMediaUrl } from "@/app/lib/constants";
 
 interface RecentActivityPanelProps {
   posts: any[];
@@ -13,6 +14,7 @@ interface ActivityItem {
   name: string;
   preview: string;
   createdAt: string;
+  photoUrl?: string | null;
 }
 
 function getTimeAgo(date: string) {
@@ -84,6 +86,7 @@ export default function RecentActivityPanel({ posts }: RecentActivityPanelProps)
           name,
           preview: `"${(c.content || "").slice(0, 60)}${(c.content || "").length > 60 ? "…" : ""}"`,
           createdAt: c.createdAt,
+          photoUrl: c.user?.profile?.golfPassport?.photoUrl || null,
         });
         for (const r of (c.replies || [])) {
           const rName = r.user?.profile?.name || r.user?.username || "Owner";
@@ -93,6 +96,7 @@ export default function RecentActivityPanel({ posts }: RecentActivityPanelProps)
             name: rName,
             preview: `"${(r.content || "").slice(0, 60)}${(r.content || "").length > 60 ? "…" : ""}"`,
             createdAt: r.createdAt,
+            photoUrl: r.user?.profile?.golfPassport?.photoUrl || null,
           });
         }
       }
@@ -108,6 +112,7 @@ export default function RecentActivityPanel({ posts }: RecentActivityPanelProps)
           name,
           preview: `"${(p.content || "").slice(0, 60)}${(p.content || "").length > 60 ? "…" : ""}"`,
           createdAt: p.createdAt,
+          photoUrl: p.user?.profile?.golfPassport?.photoUrl || null,
         });
       }
     }
@@ -147,10 +152,14 @@ export default function RecentActivityPanel({ posts }: RecentActivityPanelProps)
                   width: "34px", height: "34px", borderRadius: "5px",
                   backgroundColor: "#060D1F", display: "flex", alignItems: "center",
                   justifyContent: "center", fontSize: "10px", fontWeight: 700,
-                  color: "#E8C96A", flexShrink: 0,
+                  color: "#E8C96A", flexShrink: 0, overflow: "hidden",
                 }}
               >
-                {item.initials}
+                {item.photoUrl ? (
+                  <img src={resolveMediaUrl(item.photoUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  item.initials
+                )}
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div

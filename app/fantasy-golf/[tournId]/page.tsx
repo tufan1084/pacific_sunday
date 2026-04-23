@@ -76,6 +76,7 @@ export default function TournamentPicksPage() {
   const [showLockModal, setShowLockModal] = useState(false);
   const [nextTournament, setNextTournament] = useState<Tournament | null>(null);
   const [picksLoading, setPicksLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState<any>(null);
 
   // Reactive clock — ticks every 30s so the countdown stays live
   useEffect(() => {
@@ -179,6 +180,7 @@ export default function TournamentPicksPage() {
           const data = res.data as FantasyData;
           setTournament(data.tournament);
           setTiers(Array.isArray(data.tiers) ? data.tiers : []);
+          setLeaderboard(data.leaderboard || null);
           
           // Update cache
           fantasyCache[tournId] = {
@@ -428,6 +430,68 @@ export default function TournamentPicksPage() {
           <span style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>
             Player fields are typically published 2–3 days before the tournament starts.
           </span>
+        </div>
+      )}
+
+      {/* Live Leaderboard */}
+      {tournament?.status === "live" && leaderboard && Array.isArray(leaderboard) && leaderboard.length > 0 && (
+        <div style={{ marginTop: "clamp(16px, 3vw, 24px)" }}>
+          <div
+            style={{
+              fontSize: "clamp(16px, 2.5vw, 20px)",
+              color: "#E8C96A",
+              fontWeight: 600,
+              marginBottom: "clamp(12px, 2vw, 16px)",
+            }}
+          >
+            Live Leaderboard
+          </div>
+          <div
+            style={{
+              backgroundColor: "#13192A",
+              borderRadius: "5px",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "rgba(232,201,106,0.1)" }}>
+                    <th style={{ padding: "12px", textAlign: "left", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Pos</th>
+                    <th style={{ padding: "12px", textAlign: "left", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Player</th>
+                    <th style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Score</th>
+                    <th style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Thru</th>
+                    <th style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Today</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.slice(0, 20).map((player: any, idx: number) => (
+                    <tr
+                      key={idx}
+                      style={{
+                        borderBottom: "1px solid rgba(255,255,255,0.05)",
+                        backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
+                      }}
+                    >
+                      <td style={{ padding: "12px", color: "#FFF", fontSize: "13px" }}>{player.position || "-"}</td>
+                      <td style={{ padding: "12px", color: "#FFF", fontSize: "13px", fontWeight: 500 }}>
+                        {player.firstName} {player.lastName}
+                      </td>
+                      <td style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "13px", fontWeight: 600 }}>
+                        {player.totalScore || "E"}
+                      </td>
+                      <td style={{ padding: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
+                        {player.thru || "-"}
+                      </td>
+                      <td style={{ padding: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
+                        {player.today || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 

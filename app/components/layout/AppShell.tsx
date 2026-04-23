@@ -53,7 +53,10 @@ export default function AppShell({ children }: AppShellProps) {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <main className="flex-1 min-w-0 overflow-y-auto" style={{ padding: "20px", backgroundColor: "#060D1F" }}>
+        <main
+          className="flex-1 min-w-0 overflow-y-auto"
+          style={{ padding: "20px", backgroundColor: "#060D1F" }}
+        >
           {children}
         </main>
       </div>
