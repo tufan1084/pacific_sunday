@@ -144,15 +144,16 @@ export const api = {
   },
 
   posts: {
-    getAll: (limit?: number, offset?: number, teamId?: number) => {
+    getAll: (limit?: number, offset?: number, teamId?: number, tag?: string) => {
       const params = new URLSearchParams();
       if (limit) params.set('limit', limit.toString());
       if (offset) params.set('offset', offset.toString());
       if (teamId) params.set('teamId', teamId.toString());
+      if (tag) params.set('tag', tag);
       return fetchApi(`/posts?${params.toString()}`);
     },
     getPublic: (postId: number) => fetchApi(`/posts/${postId}/public`),
-    create: (data: { content: string; postType?: string; mediaUrls?: string[]; teamId?: number }) =>
+    create: (data: { content: string; postType?: string; mediaUrls?: string[]; teamId?: number; tags?: string[] }) =>
       fetchApi("/posts", { method: "POST", body: JSON.stringify(data) }),
     uploadMedia: async (files: File[]) => {
       const formData = new FormData();
@@ -260,6 +261,13 @@ export const api = {
       ),
     getUserProfile: (userId: number) =>
       fetchApi<{ user: ApiUserProfile }>(`/users/${userId}`),
+  },
+
+  tags: {
+    list: () =>
+      fetchApi<{ tags: { id: number; slug: string; label: string; description: string | null }[] }>(
+        "/tags"
+      ),
   },
 
   search: {

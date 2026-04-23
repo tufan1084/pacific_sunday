@@ -4,23 +4,26 @@ import { useState, useRef, useEffect } from "react";
 import { api } from "@/app/services/api";
 import { resolveMediaUrl } from "@/app/lib/constants";
 import { useToast } from "@/app/context/ToastContext";
-import { IoImageOutline, IoVideocamOutline, IoClose, IoChevronDown, IoEarthOutline, IoLockClosedOutline, IoPeopleOutline } from "react-icons/io5";
+import { IoImageOutline, IoVideocamOutline, IoClose, IoChevronDown, IoEarthOutline, IoLockClosedOutline, IoPeopleOutline, IoPricetagOutline } from "react-icons/io5";
 import type { Team } from "@/app/types/community";
+import type { TagOption } from "@/app/lib/community-data";
 
 interface CreatePostInlineProps {
   onPostCreated: () => void;
   activeTeam: Team | null;
   userTeams: Team[];
+  tagOptions?: TagOption[];
   onTeamChange: (filterName: string) => void;
 }
 
-export default function CreatePostInline({ onPostCreated, activeTeam, userTeams, onTeamChange }: CreatePostInlineProps) {
+export default function CreatePostInline({ onPostCreated, activeTeam, userTeams, tagOptions = [], onTeamChange }: CreatePostInlineProps) {
   const { showToast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [content, setContent] = useState("");
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [teamOpen, setTeamOpen] = useState(false);
+  const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -82,7 +85,14 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
     setContent("");
     setMediaFiles([]);
     setMediaPreviews([]);
+    setSelectedTagSlugs([]);
     setExpanded(false);
+  };
+
+  const toggleTag = (slug: string) => {
+    setSelectedTagSlugs(prev =>
+      prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug]
+    );
   };
 
   const handleSubmit = async () => {
@@ -112,6 +122,7 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
         postType,
         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
         teamId: activeTeam?.id,
+        tags: selectedTagSlugs.length > 0 ? selectedTagSlugs : undefined,
       });
       if (res.success) {
         showToast("Post created!", "success");
@@ -363,6 +374,46 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Category picker — optional. Auto-tagging still runs on the server
+          from the post content; these are manual overrides / additions. */}
+      {tagOptions.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-2"
+          style={{ marginTop: "10px" }}
+        >
+          <span
+            className="flex items-center gap-1"
+            style={{ color: "#888", fontSize: "11px" }}
+          >
+            <IoPricetagOutline size={12} />
+            Category
+          </span>
+          {tagOptions.map((tag) => {
+            const active = selectedTagSlugs.includes(tag.slug);
+            return (
+              <button
+                key={tag.slug}
+                type="button"
+                onClick={() => toggleTag(tag.slug)}
+                disabled={loading}
+                style={{
+                  border: active ? "1px solid #E8C96A" : "1px solid rgba(255,255,255,0.1)",
+                  backgroundColor: active ? "rgba(232,201,106,0.15)" : "transparent",
+                  color: active ? "#E8C96A" : "#888",
+                  fontSize: "11px",
+                  padding: "4px 10px",
+                  borderRadius: "999px",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {tag.label}
+              </button>
+            );
+          })}
         </div>
       )}
 

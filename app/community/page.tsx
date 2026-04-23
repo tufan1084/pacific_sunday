@@ -15,7 +15,7 @@ import TeamMembersSheet from "@/app/components/community/TeamMembersSheet";
 import AddTeamPanel from "@/app/components/community/AddTeamPanel";
 import MobileTeamSheet from "@/app/components/community/MobileTeamSheet";
 import GlobalSearchBar from "@/app/components/layout/GlobalSearchBar";
-import { COMMUNITY_STATS, TAG_KEYWORDS } from "@/app/lib/community-data";
+import { COMMUNITY_STATS, type TagOption } from "@/app/lib/community-data";
 import { api } from "@/app/services/api";
 import { SOCKET_URL } from "@/app/lib/constants";
 import type { Team } from "@/app/types/community";
@@ -23,14 +23,17 @@ import { useToast } from "@/app/context/ToastContext";
 
 const ALL_OWNERS = "All Owners";
 
-function detectPostTags(post: any): string[] {
-  const content = (post.content || "").toLowerCase();
-  const auto: string[] = [];
-  for (const [tag, kws] of Object.entries(TAG_KEYWORDS)) {
-    if (kws.some(k => content.includes(k))) auto.push(tag);
+// The backend now returns `tagSlugs: string[]` on each post (derived from
+// PostTag rows). Tabs "All Post" and "Pinned" are special — the rest are
+// driven by the Tag table (admin-managed in /management-portal/tags).
+function postTagSlugs(post: any): string[] {
+  if (Array.isArray(post?.tagSlugs)) return post.tagSlugs;
+  if (Array.isArray(post?.tags)) {
+    return post.tags
+      .map((t: any) => (typeof t === "string" ? t : t?.tag?.slug ?? t?.slug))
+      .filter(Boolean);
   }
-  const manual: string[] = Array.isArray(post.tags) ? post.tags : [];
-  return Array.from(new Set([...auto, ...manual]));
+  return [];
 }
 
 export default function CommunityPage() {
@@ -40,6 +43,7 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>(initialTeam);
   const [activeTab, setActiveTab] = useState<string>("All Post");
 
@@ -122,7 +126,7 @@ export default function CommunityPage() {
         const data = res.data as any;
         const withTags = (data?.posts ?? []).map((p: any) => ({
           ...p,
-          _computedTags: detectPostTags(p),
+          _computedTags: postTagSlugs(p),
         }));
         setPosts(withTags);
       }
@@ -132,6 +136,17 @@ export default function CommunityPage() {
       setLoading(false);
     }
   }, []);
+
+  const fetchTags = useCallback(async () => {
+    try {
+      const res = await api.tags.list();
+      if (res.success) setTagOptions((res.data as any)?.tags ?? []);
+    } catch (e) {
+      console.error("Failed to fetch tags:", e);
+    }
+  }, []);
+
+  useEffect(() => { fetchTags(); }, [fetchTags]);
 
   // Re-fetch posts when active team changes
   useEffect(() => {
@@ -172,7 +187,7 @@ export default function CommunityPage() {
         // Only show if it belongs in the current view: global feed OR matching team
         if (at && newPost.teamId !== at.id) return prev;
         if (!at && newPost.team?.privacy === "private" && !ts.find(t => t.id === newPost.teamId && t.isMember)) return prev;
-        return [{ ...newPost, _computedTags: detectPostTags(newPost) }, ...prev];
+        return [{ ...newPost, _computedTags: postTagSlugs(newPost) }, ...prev];
       });
     });
 
@@ -274,10 +289,12 @@ export default function CommunityPage() {
 
     if (activeTab === "Pinned") {
       list = list.filter(p => p.isPinned);
-    } else if (activeTab === "Fantasy Talk") {
-      list = list.filter(p => (p._computedTags || []).includes("fantasy_talk"));
-    } else if (activeTab === "Bag Flex") {
-      list = list.filter(p => (p._computedTags || []).includes("bag_flex"));
+    } else if (activeTab !== "All Post") {
+      // Anything else is a tag label coming from the server — match by slug.
+      const tag = tagOptions.find(t => t.label === activeTab);
+      if (tag) {
+        list = list.filter(p => (p._computedTags || []).includes(tag.slug));
+      }
     }
 
     // Mirror backend sort: pinned first, then newest first — keeps UI in sync
@@ -289,7 +306,7 @@ export default function CommunityPage() {
       const bt = new Date(b.createdAt).getTime();
       return bt - at;
     });
-  }, [posts, activeTab, hiddenPostIds, hiddenUserIds]);
+  }, [posts, activeTab, hiddenPostIds, hiddenUserIds, tagOptions]);
 
   const handleHidePost = (postId: number) => {
     setHiddenPostIds(prev => [...prev, postId]);
@@ -368,6 +385,7 @@ export default function CommunityPage() {
             <CommunityHeader />
             <CommunityFilters
               teams={teams}
+              tabs={["All Post", "Pinned", ...tagOptions.map(t => t.label)]}
               activeFilter={activeFilter}
               activeTab={activeTab}
               onFilterChange={(f) => { setActiveFilter(f); setShowMembersSheet(false); }}
@@ -378,6 +396,7 @@ export default function CommunityPage() {
               onPostCreated={() => fetchPosts(activeTeam?.id)}
               activeTeam={activeTeam}
               userTeams={teams.filter(t => t.isMember)}
+              tagOptions={tagOptions}
               onTeamChange={(name) => setActiveFilter(name)}
             />
           </div>
@@ -407,10 +426,8 @@ export default function CommunityPage() {
               <div style={{ fontSize: "15px", marginBottom: "6px" }}>
                 {activeTab === "Pinned"
                   ? "No pinned posts yet."
-                  : activeTab === "Fantasy Talk"
-                  ? "No fantasy talk posts yet."
-                  : activeTab === "Bag Flex"
-                  ? "No bag flex posts yet."
+                  : activeTab !== "All Post"
+                  ? `No posts in ${activeTab} yet.`
                   : activeTeam
                   ? `No posts in ${activeTeam.name} yet.`
                   : "No posts yet."}

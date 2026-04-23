@@ -5,11 +5,12 @@ import Image from "next/image";
 import { IoAdd, IoEarthOutline, IoLockClosedOutline, IoChevronDown } from "react-icons/io5";
 import type { Team } from "@/app/types/community";
 
-const TABS = ["All Post", "Pinned", "Fantasy Talk", "Bag Flex"];
+const DEFAULT_TABS = ["All Post", "Pinned"];
 const ALL_OWNERS = "All Owners";
 
 interface CommunityFiltersProps {
   teams: Team[];
+  tabs?: string[];
   activeFilter: string;
   activeTab: string;
   onFilterChange: (filter: string) => void;
@@ -18,8 +19,9 @@ interface CommunityFiltersProps {
 }
 
 export default function CommunityFilters({
-  teams, activeFilter, activeTab, onFilterChange, onTabChange, onAddTeam,
+  teams, tabs, activeFilter, activeTab, onFilterChange, onTabChange, onAddTeam,
 }: CommunityFiltersProps) {
+  const tabList = tabs && tabs.length > 0 ? tabs : DEFAULT_TABS;
   const [teamOpen, setTeamOpen] = useState(false);
   const [tabOpen, setTabOpen] = useState(false);
   const teamRef = useRef<HTMLDivElement>(null);
@@ -192,7 +194,7 @@ export default function CommunityFilters({
 
         {tabOpen && (
           <div style={menuStyle}>
-            {TABS.map((tab) => {
+            {tabList.map((tab) => {
               const isActive = activeTab === tab;
               return (
                 <button

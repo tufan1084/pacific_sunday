@@ -95,6 +95,8 @@ export default function TournamentSection({
   const [expandedTournId, setExpandedTournId] = useState<string | null>(null);
   const [resultsData, setResultsData] = useState<Record<string, CompletedResults>>({});
   const [resultsLoading, setResultsLoading] = useState<string | null>(null);
+  const [liveLeaderboards, setLiveLeaderboards] = useState<Record<string, CompletedResults>>({});
+  const [liveLoading, setLiveLoading] = useState<Record<string, boolean>>({});
 
   // Track which upcoming tournaments have picks
   const [tournamentsWithPicks, setTournamentsWithPicks] = useState<Set<string>>(new Set());
@@ -136,6 +138,33 @@ export default function TournamentSection({
 
     fetchPicks();
   }, [nextUpcomingTournament]);
+
+  // Fetch live leaderboards for all live tournaments
+  useEffect(() => {
+    const fetchLiveLeaderboards = async () => {
+      if (live.length === 0) return;
+
+      for (const tournament of live) {
+        if (liveLeaderboards[tournament.tournId]) continue; // Already loaded
+
+        setLiveLoading(prev => ({ ...prev, [tournament.tournId]: true }));
+        try {
+          const res = await api.golf.getTournamentFantasy(tournament.tournId);
+          if (res.success && res.data) {
+            const d = res.data as { tournament: { courseName: string | null }; leaderboard: { rows: FantasyLeaderboardRow[] } | null };
+            const rows = d.leaderboard?.rows ?? [];
+            setLiveLeaderboards(prev => ({ ...prev, [tournament.tournId]: { courseName: d.tournament.courseName, rows } }));
+          }
+        } catch {
+          // Silent fail
+        } finally {
+          setLiveLoading(prev => ({ ...prev, [tournament.tournId]: false }));
+        }
+      }
+    };
+
+    fetchLiveLeaderboards();
+  }, [live]);
 
   const lists: Record<Tab, Tournament[]> = { live, upcoming, completed };
   const events = lists[activeTab];
@@ -583,103 +612,171 @@ export default function TournamentSection({
               </thead>
               <tbody>
                 {events.map((event) => {
+                  const leaderboard = liveLeaderboards[event.tournId];
+                  const isLoading = liveLoading[event.tournId];
+
                   return (
-                    <tr
-                      key={event.tournId}
-                      style={{
-                        borderBottom: "1px solid rgba(255,255,255,0.05)",
-                        transition: "background-color 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "rgba(74,222,128,0.05)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <td
+                    <React.Fragment key={event.tournId}>
+                      <tr
                         style={{
-                          padding: "clamp(12px, 2vw, 16px)",
+                          borderBottom: "1px solid rgba(255,255,255,0.05)",
+                          transition: "background-color 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "rgba(74,222,128,0.05)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
                         }}
                       >
-                        <div className="flex items-center" style={{ gap: "8px" }}>
-                          <span
-                            style={{
-                              color: "#FFFFFF",
-                              fontWeight: 500,
-                              fontSize: "clamp(12px, 1.5vw, 14px)",
-                            }}
-                          >
-                            {event.name}
-                          </span>
-                          {event.isMajor && (
+                        <td
+                          style={{
+                            padding: "clamp(12px, 2vw, 16px)",
+                          }}
+                        >
+                          <div className="flex items-center" style={{ gap: "8px" }}>
+                            <span
+                              style={{
+                                color: "#FFFFFF",
+                                fontWeight: 500,
+                                fontSize: "clamp(12px, 1.5vw, 14px)",
+                              }}
+                            >
+                              {event.name}
+                            </span>
+                            {event.isMajor && (
+                              <span
+                                style={{
+                                  fontSize: "9px",
+                                  fontWeight: 600,
+                                  backgroundColor: "#E8C96A",
+                                  color: "#060D1F",
+                                  padding: "2px 6px",
+                                  borderRadius: "3px",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                MAJOR
+                              </span>
+                            )}
                             <span
                               style={{
                                 fontSize: "9px",
                                 fontWeight: 600,
-                                backgroundColor: "#E8C96A",
+                                backgroundColor: "#4ADE80",
                                 color: "#060D1F",
                                 padding: "2px 6px",
                                 borderRadius: "3px",
                                 flexShrink: 0,
                               }}
                             >
-                              MAJOR
+                              LIVE
                             </span>
-                          )}
-                          <span
-                            style={{
-                              fontSize: "9px",
-                              fontWeight: 600,
-                              backgroundColor: "#4ADE80",
-                              color: "#060D1F",
-                              padding: "2px 6px",
-                              borderRadius: "3px",
-                              flexShrink: 0,
-                            }}
-                          >
-                            LIVE
-                          </span>
-                        </div>
-                      </td>
-                      <td
-                        style={{
-                          padding: "clamp(12px, 2vw, 16px)",
-                          color: "rgba(255,255,255,0.6)",
-                          fontSize: "clamp(11px, 1.5vw, 13px)",
-                        }}
-                      >
-                        {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
-                      </td>
-                      <td
-                        style={{
-                          padding: "clamp(12px, 2vw, 16px)",
-                          textAlign: "center",
-                        }}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelect(event.tournId);
-                          }}
+                          </div>
+                        </td>
+                        <td
                           style={{
-                            padding: "6px 16px",
-                            borderRadius: "5px",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "clamp(11px, 1.5vw, 12px)",
-                            fontWeight: 600,
-                            fontFamily: "var(--font-poppins), sans-serif",
-                            backgroundColor: "#4ADE80",
-                            color: "#060D1F",
-                            whiteSpace: "nowrap",
-                            transition: "all 0.2s ease",
+                            padding: "clamp(12px, 2vw, 16px)",
+                            color: "rgba(255,255,255,0.6)",
+                            fontSize: "clamp(11px, 1.5vw, 13px)",
                           }}
                         >
-                          View Live
-                        </button>
-                      </td>
-                    </tr>
+                          {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                        </td>
+                        <td
+                          style={{
+                            padding: "clamp(12px, 2vw, 16px)",
+                            textAlign: "center",
+                          }}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelect(event.tournId);
+                            }}
+                            style={{
+                              padding: "6px 16px",
+                              borderRadius: "5px",
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: "clamp(11px, 1.5vw, 12px)",
+                              fontWeight: 600,
+                              fontFamily: "var(--font-poppins), sans-serif",
+                              backgroundColor: "#4ADE80",
+                              color: "#060D1F",
+                              whiteSpace: "nowrap",
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            View Live
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Live Leaderboard Row */}
+                      {leaderboard && leaderboard.rows.length > 0 && (
+                        <tr>
+                          <td colSpan={3} style={{ padding: 0, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <div style={{ backgroundColor: "rgba(74,222,128,0.03)", padding: "16px" }}>
+                              <div style={{ fontSize: "14px", color: "#4ADE80", fontWeight: 600, marginBottom: "12px" }}>Live Leaderboard</div>
+                              {isLoading ? (
+                                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", textAlign: "center", padding: "16px 0" }}>
+                                  Loading leaderboard...
+                                </div>
+                              ) : (
+                                <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto" }}>
+                                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                                    <thead style={{ position: "sticky", top: 0, backgroundColor: "#13192A", zIndex: 1 }}>
+                                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                                        <th style={{ padding: "8px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Pos</th>
+                                        <th style={{ padding: "8px 8px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase", minWidth: "140px" }}>Player</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Score</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Thru</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Today</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {leaderboard.rows.slice(0, 15).map((player, i) => {
+                                        const flag = getCountryFlag(player.country);
+                                        const isLeader = i === 0;
+                                        return (
+                                          <tr key={player.playerId || i} style={{ borderBottom: i < 14 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                            <td style={{ padding: "10px 4px", color: isLeader ? "#4ADE80" : "rgba(255,255,255,0.5)", fontWeight: isLeader ? 600 : 400, fontSize: "12px" }}>
+                                              {player.position}
+                                            </td>
+                                            <td style={{ padding: "10px 8px" }}>
+                                              <div className="flex items-center" style={{ gap: "6px" }}>
+                                                {isLeader && <span style={{ fontSize: "14px" }}>🏆</span>}
+                                                <span style={{ color: isLeader ? "#4ADE80" : "#FFFFFF", fontWeight: isLeader ? 600 : 400 }}>
+                                                  {player.name}
+                                                </span>
+                                                {flag && <span style={{ fontSize: "11px" }}>{flag}</span>}
+                                              </div>
+                                            </td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: getScoreColor(player), fontWeight: 600 }}>
+                                              {player.score}
+                                            </td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "11px" }}>
+                                              {player.thru}
+                                            </td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>
+                                              {player.currentRoundScore || "-"}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", textAlign: "center", marginTop: "12px" }}>
+                                    Showing top 15 · {leaderboard.courseName}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -690,79 +787,139 @@ export default function TournamentSection({
         {/* Mobile Card View */}
         <div className="md:hidden" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {events.map((event) => {
+            const leaderboard = liveLeaderboards[event.tournId];
+            const isLoading = liveLoading[event.tournId];
+
             return (
-              <div
-                key={event.tournId}
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.03)",
-                  borderRadius: "5px",
-                  padding: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="flex items-center" style={{ gap: "6px", marginBottom: "4px", flexWrap: "wrap" }}>
-                    <span style={{ color: "#FFFFFF", fontWeight: 500, fontSize: "14px" }}>
-                      {event.name}
-                    </span>
-                    {event.isMajor && (
+              <div key={event.tournId} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.03)",
+                    borderRadius: "5px",
+                    padding: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="flex items-center" style={{ gap: "6px", marginBottom: "4px", flexWrap: "wrap" }}>
+                      <span style={{ color: "#FFFFFF", fontWeight: 500, fontSize: "14px" }}>
+                        {event.name}
+                      </span>
+                      {event.isMajor && (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            fontWeight: 600,
+                            backgroundColor: "#E8C96A",
+                            color: "#060D1F",
+                            padding: "2px 6px",
+                            borderRadius: "3px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          MAJOR
+                        </span>
+                      )}
                       <span
                         style={{
                           fontSize: "9px",
                           fontWeight: 600,
-                          backgroundColor: "#E8C96A",
+                          backgroundColor: "#4ADE80",
                           color: "#060D1F",
                           padding: "2px 6px",
                           borderRadius: "3px",
                           flexShrink: 0,
                         }}
                       >
-                        MAJOR
+                        LIVE
                       </span>
-                    )}
-                    <span
-                      style={{
-                        fontSize: "9px",
-                        fontWeight: 600,
-                        backgroundColor: "#4ADE80",
-                        color: "#060D1F",
-                        padding: "2px 6px",
-                        borderRadius: "3px",
-                        flexShrink: 0,
-                      }}
-                    >
-                      LIVE
-                    </span>
-                    <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", marginLeft: "4px" }}>
+                      <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px", marginLeft: "4px" }}>
+                        {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
+                      </span>
+                    </div>
+                    <div className="sm:hidden" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px" }}>
                       {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
-                    </span>
+                    </div>
                   </div>
-                  <div className="sm:hidden" style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px" }}>
-                    {formatDate(event.startDate)}{event.endDate && `–${formatDate(event.endDate)}`}
-                  </div>
+                  <button
+                    onClick={() => onSelect(event.tournId)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "5px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      fontFamily: "var(--font-poppins), sans-serif",
+                      backgroundColor: "#4ADE80",
+                      color: "#060D1F",
+                      transition: "all 0.2s ease",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    View Live
+                  </button>
                 </div>
-                <button
-                  onClick={() => onSelect(event.tournId)}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: "5px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    fontFamily: "var(--font-poppins), sans-serif",
-                    backgroundColor: "#4ADE80",
-                    color: "#060D1F",
-                    transition: "all 0.2s ease",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
-                >
-                  View Live
-                </button>
+
+                {/* Live Leaderboard */}
+                {isLoading && (
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "5px", padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: "12px" }}>
+                    Loading leaderboard...
+                  </div>
+                )}
+
+                {!isLoading && leaderboard && leaderboard.rows.length > 0 && (
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "5px", padding: "12px" }}>
+                    <div style={{ fontSize: "13px", color: "#E8C96A", fontWeight: 600, marginBottom: "8px" }}>Live Leaderboard</div>
+                    <div style={{ overflowX: "auto", maxHeight: "300px", overflowY: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                        <thead style={{ position: "sticky", top: 0, backgroundColor: "#13192A", zIndex: 1 }}>
+                          <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                            <th style={{ padding: "6px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Pos</th>
+                            <th style={{ padding: "6px 6px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase", minWidth: "100px" }}>Player</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Score</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Thru</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Today</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leaderboard.rows.slice(0, 10).map((player, i) => {
+                            const flag = getCountryFlag(player.country);
+                            const isLeader = i === 0;
+                            return (
+                              <tr key={player.playerId || i} style={{ borderBottom: i < 9 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                <td style={{ padding: "8px 4px", color: isLeader ? "#E8C96A" : "rgba(255,255,255,0.5)", fontWeight: isLeader ? 600 : 400, fontSize: "11px" }}>
+                                  {player.position}
+                                </td>
+                                <td style={{ padding: "8px 6px" }}>
+                                  <div className="flex items-center" style={{ gap: "4px" }}>
+                                    <span style={{ color: isLeader ? "#E8C96A" : "#FFFFFF", fontWeight: isLeader ? 600 : 400, fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                      {player.name}
+                                    </span>
+                                    {flag && <span style={{ fontSize: "10px", flexShrink: 0 }}>{flag}</span>}
+                                  </div>
+                                </td>
+                                <td style={{ padding: "8px 4px", textAlign: "center", color: getScoreColor(player), fontWeight: 600, fontSize: "11px" }}>
+                                  {player.score}
+                                </td>
+                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "10px" }}>
+                                  {player.thru}
+                                </td>
+                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>
+                                  {player.currentRoundScore || "-"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
