@@ -1,52 +1,86 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import TournamentSection from "@/app/components/fantasy/TournamentSection";
 import FantasyStats from "@/app/components/fantasy/FantasyStats";
 import { api } from "@/app/services/api";
 import { FANTASY_STATS } from "@/app/lib/fantasy-data";
 import type { TournamentList } from "@/app/types/fantasy";
+import type { FantasyStatCard } from "@/app/types/fantasy";
 
 const EMPTY: TournamentList = { completed: [], live: [], upcoming: [] };
 
-// Simple in-memory cache
+// Module-level caches persist across client navigations so the page fetches
+// once per session (5-min TTL). `null` balance = never fetched; 0 is a real value.
 let tournamentsCache: { data: TournamentList; timestamp: number } | null = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let walletCache: { balance: number; timestamp: number } | null = null;
+const CACHE_DURATION = 5 * 60 * 1000;
 
 export default function FantasyGolfPage() {
   const router = useRouter();
   const [tournaments, setTournaments] = useState<TournamentList>(tournamentsCache?.data || EMPTY);
   const [tournLoading, setTournLoading] = useState(!tournamentsCache);
+  const [walletBalance, setWalletBalance] = useState<number | null>(walletCache?.balance ?? null);
 
   useEffect(() => {
     let cancelled = false;
-    
-    // Check if cache is valid
     const now = Date.now();
-    if (tournamentsCache && (now - tournamentsCache.timestamp) < CACHE_DURATION) {
-      setTournaments(tournamentsCache.data);
+    const tournFresh = tournamentsCache && (now - tournamentsCache.timestamp) < CACHE_DURATION;
+    const walletFresh = walletCache && (now - walletCache.timestamp) < CACHE_DURATION;
+
+    if (tournFresh) {
+      setTournaments(tournamentsCache!.data);
       setTournLoading(false);
-      return;
+    }
+    if (walletFresh) setWalletBalance(walletCache!.balance);
+
+    const tasks: Promise<void>[] = [];
+
+    if (!tournFresh) {
+      tasks.push((async () => {
+        try {
+          const res = await api.golf.getTournaments();
+          if (!cancelled && res.success && res.data) {
+            const data = res.data as TournamentList;
+            setTournaments(data);
+            tournamentsCache = { data, timestamp: Date.now() };
+          }
+        } catch {
+          // leave EMPTY on failure
+        } finally {
+          if (!cancelled) setTournLoading(false);
+        }
+      })());
     }
 
-    (async () => {
-      try {
-        const res = await api.golf.getTournaments();
-        if (!cancelled && res.success && res.data) {
-          const data = res.data as TournamentList;
-          setTournaments(data);
-          // Update cache
-          tournamentsCache = { data, timestamp: Date.now() };
+    if (!walletFresh) {
+      tasks.push((async () => {
+        try {
+          const res = await api.points.getWallet();
+          if (!cancelled && res.success && res.data) {
+            const balance = res.data.wallet?.balance ?? 0;
+            setWalletBalance(balance);
+            walletCache = { balance, timestamp: Date.now() };
+          }
+        } catch {
+          // leave prior/null balance on failure — card will render "—"
         }
-      } catch {
-        // leave EMPTY on failure
-      } finally {
-        if (!cancelled) setTournLoading(false);
-      }
-    })();
+      })());
+    }
+
+    void Promise.all(tasks);
     return () => { cancelled = true; };
   }, []);
+
+  const stats = useMemo<FantasyStatCard[]>(() => {
+    const pointsValue = walletBalance === null ? "—" : walletBalance.toLocaleString("en-US");
+    return [
+      { value: pointsValue, label: "Your Points" },
+      FANTASY_STATS[1],
+      FANTASY_STATS[2],
+    ];
+  }, [walletBalance]);
 
   // Signal "field ready" — first upcoming/live tournament with fieldAvailable=true
   const availableTournId =
@@ -78,8 +112,8 @@ export default function FantasyGolfPage() {
         Fantasy Golf · Pick your players each week and compete with your club
       </div>
 
-      <FantasyStats 
-        stats={FANTASY_STATS} 
+      <FantasyStats
+        stats={stats}
         liveTournaments={tournaments.live}
         upcomingTournaments={tournaments.upcoming}
       />

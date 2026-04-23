@@ -4,6 +4,8 @@ interface LockPicksFooterProps {
   tournamentName: string;
 }
 
+// Picks lock at midnight PT of the tournament start day (see backend picksLocked).
+// Format the displayed lock time in PT to match.
 function formatLockDate(dateStr: string) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -11,7 +13,8 @@ function formatLockDate(dateStr: string) {
     weekday: "short",
     month: "short",
     day: "numeric",
-  }) + ", 8:00 AM ET";
+    timeZone: "America/Los_Angeles",
+  }) + ", 12:00 AM PT";
 }
 
 export default function LockPicksFooter({ locked, lockDate, tournamentName }: LockPicksFooterProps) {

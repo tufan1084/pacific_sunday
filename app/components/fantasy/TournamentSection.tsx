@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import type { Tournament } from "@/app/types/fantasy";
+import type { Tournament, ApiTier } from "@/app/types/fantasy";
+import LockedPicksTable from "@/app/components/fantasy/LockedPicksTable";
 
 // Shape of the /fantasy endpoint response (leaderboard is denormalized in DB JSONB)
 type FantasyLeaderboardRow = {
@@ -41,10 +42,12 @@ const TAB_LABELS: Record<Tab, string> = {
   completed: "Completed",
 };
 
+// DB stores UTC; UI always renders in Pacific Time so tournament days line up
+// with the PGA's Thu–Sun schedule regardless of the viewer's timezone.
 function formatDate(dateStr: string) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Los_Angeles" });
 }
 
 function getCountryFlag(country: string) {
@@ -97,6 +100,9 @@ export default function TournamentSection({
   const [resultsLoading, setResultsLoading] = useState<string | null>(null);
   const [liveLeaderboards, setLiveLeaderboards] = useState<Record<string, CompletedResults>>({});
   const [liveLoading, setLiveLoading] = useState<Record<string, boolean>>({});
+  // Tiers + the current user's locked picks, per live tournament — used to render
+  // the "Your Locked Picks" panel directly in the live tab.
+  const [livePicksData, setLivePicksData] = useState<Record<string, { tiers: ApiTier[]; picks: Record<string, string | null> }>>({});
 
   // Track which upcoming tournaments have picks
   const [tournamentsWithPicks, setTournamentsWithPicks] = useState<Set<string>>(new Set());
@@ -139,9 +145,11 @@ export default function TournamentSection({
     fetchPicks();
   }, [nextUpcomingTournament]);
 
-  // Fetch live leaderboards for all live tournaments
+  // Fetch live tournament data (leaderboard + tiers + the signed-in user's picks).
+  // Backend now returns `leaderboard` as a flat row array (or null), matching the
+  // detail-page contract. Picks fetch silently no-ops for unauthenticated users.
   useEffect(() => {
-    const fetchLiveLeaderboards = async () => {
+    const fetchLiveData = async () => {
       if (live.length === 0) return;
 
       for (const tournament of live) {
@@ -151,9 +159,26 @@ export default function TournamentSection({
         try {
           const res = await api.golf.getTournamentFantasy(tournament.tournId);
           if (res.success && res.data) {
-            const d = res.data as { tournament: { courseName: string | null }; leaderboard: { rows: FantasyLeaderboardRow[] } | null };
-            const rows = d.leaderboard?.rows ?? [];
+            const d = res.data as {
+              tournament: { courseName: string | null };
+              tiers: ApiTier[];
+              leaderboard: FantasyLeaderboardRow[] | null;
+            };
+            const rows = Array.isArray(d.leaderboard) ? d.leaderboard : [];
             setLiveLeaderboards(prev => ({ ...prev, [tournament.tournId]: { courseName: d.tournament.courseName, rows } }));
+
+            // Pair the user's picks with the tier data so LockedPicksTable can resolve names.
+            try {
+              const picksRes = await api.golf.getPicks(tournament.tournId);
+              if (picksRes.success && picksRes.data?.picks) {
+                setLivePicksData(prev => ({
+                  ...prev,
+                  [tournament.tournId]: { tiers: d.tiers || [], picks: picksRes.data!.picks },
+                }));
+              }
+            } catch {
+              // Unauthenticated or no picks — skip the locked-picks panel silently.
+            }
           }
         } catch {
           // Silent fail
@@ -163,7 +188,7 @@ export default function TournamentSection({
       }
     };
 
-    fetchLiveLeaderboards();
+    fetchLiveData();
   }, [live]);
 
   const lists: Record<Tab, Tournament[]> = { live, upcoming, completed };
@@ -181,8 +206,8 @@ export default function TournamentSection({
     try {
       const res = await api.golf.getTournamentFantasy(tournId);
       if (res.success && res.data) {
-        const d = res.data as { tournament: { courseName: string | null }; leaderboard: { rows: FantasyLeaderboardRow[] } | null };
-        const rows = d.leaderboard?.rows ?? [];
+        const d = res.data as { tournament: { courseName: string | null }; leaderboard: FantasyLeaderboardRow[] | null };
+        const rows = Array.isArray(d.leaderboard) ? d.leaderboard : [];
         setResultsData((prev) => ({ ...prev, [tournId]: { courseName: d.tournament.courseName, rows } }));
       }
     } catch {
@@ -614,6 +639,8 @@ export default function TournamentSection({
                 {events.map((event) => {
                   const leaderboard = liveLeaderboards[event.tournId];
                   const isLoading = liveLoading[event.tournId];
+                  const picksData = livePicksData[event.tournId];
+                  const hasLockedPicks = picksData && Object.values(picksData.picks).some(Boolean);
 
                   return (
                     <React.Fragment key={event.tournId}>
@@ -713,8 +740,21 @@ export default function TournamentSection({
                         </td>
                       </tr>
 
-                      {/* Live Leaderboard Row */}
-                      {leaderboard && leaderboard.rows.length > 0 && (
+                      {/* Your Locked Picks — rendered in the live tab so users see
+                          their picks without drilling into the detail page. */}
+                      {hasLockedPicks && (
+                        <tr>
+                          <td colSpan={3} style={{ padding: 0, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <div style={{ padding: "16px" }}>
+                              <LockedPicksTable tiers={picksData!.tiers} picks={picksData!.picks} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Live Leaderboard Row — also shown while waiting for first tee so
+                          users see the state instead of an invisible section. */}
+                      {(leaderboard || isLoading) && (
                         <tr>
                           <td colSpan={3} style={{ padding: 0, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                             <div style={{ backgroundColor: "rgba(74,222,128,0.03)", padding: "16px" }}>
@@ -722,6 +762,10 @@ export default function TournamentSection({
                               {isLoading ? (
                                 <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", textAlign: "center", padding: "16px 0" }}>
                                   Loading leaderboard...
+                                </div>
+                              ) : !leaderboard || leaderboard.rows.length === 0 ? (
+                                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>
+                                  Waiting for first tee off · leaderboard updates hourly once play begins
                                 </div>
                               ) : (
                                 <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto" }}>
@@ -789,6 +833,8 @@ export default function TournamentSection({
           {events.map((event) => {
             const leaderboard = liveLeaderboards[event.tournId];
             const isLoading = liveLoading[event.tournId];
+            const picksData = livePicksData[event.tournId];
+            const hasLockedPicks = picksData && Object.values(picksData.picks).some(Boolean);
 
             return (
               <div key={event.tournId} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -865,10 +911,21 @@ export default function TournamentSection({
                   </button>
                 </div>
 
+                {/* Your Locked Picks (mobile) — shown inline on the live tab. */}
+                {hasLockedPicks && (
+                  <LockedPicksTable tiers={picksData!.tiers} picks={picksData!.picks} />
+                )}
+
                 {/* Live Leaderboard */}
                 {isLoading && (
                   <div style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "5px", padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: "12px" }}>
                     Loading leaderboard...
+                  </div>
+                )}
+
+                {!isLoading && (!leaderboard || leaderboard.rows.length === 0) && (
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "5px", padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "12px" }}>
+                    Waiting for first tee off · leaderboard updates hourly once play begins
                   </div>
                 )}
 

@@ -98,7 +98,14 @@ export const api = {
     // Picks — authenticated
     getPicks: (tournId: string, year?: number) => {
       const params = year ? `?year=${year}` : '';
-      return fetchApi<{ picks: Record<string, string | null>; submittedAt: string; lockedAt: string | null } | null>(
+      return fetchApi<{
+        picks: Record<string, string | null>;
+        submittedAt: string;
+        lockedAt: string | null;
+        pointsAwarded: number | null;
+        scoring: { playerScores: Array<{ tier: string; playerId: string; playerName: string; score: string; points: number }>; totalPoints: number } | null;
+        pointsCalculatedAt: string | null;
+      } | null>(
         `/golf/tournament/${tournId}/picks${params}`
       );
     },
@@ -301,6 +308,33 @@ export const api = {
         `/search?type=teams&q=${encodeURIComponent(q)}`
       ),
   },
+
+  // Points system
+  points: {
+    getRanges: () =>
+      fetchApi<{ ranges: ApiPointsRange[] }>("/points/ranges"),
+    createRange: (data: { name: string; minScore: number; maxScore: number; points: number; sortOrder?: number }) =>
+      fetchApi<{ range: ApiPointsRange }>("/points/ranges", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateRange: (
+      id: number,
+      data: Partial<{ name: string; minScore: number; maxScore: number; points: number; isActive: boolean; sortOrder: number }>
+    ) =>
+      fetchApi<{ range: ApiPointsRange }>(`/points/ranges/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    deleteRange: (id: number) =>
+      fetchApi(`/points/ranges/${id}`, { method: "DELETE" }),
+    calculateTournamentPoints: (tournId: string, year?: number) =>
+      fetchApi(`/points/calculate/${tournId}${year ? `?year=${year}` : ""}`, {
+        method: "POST",
+      }),
+    getWallet: () =>
+      fetchApi<{ wallet: ApiPointsWallet }>("/points/wallet"),
+  },
 };
 
 export interface ApiTeam {
@@ -344,6 +378,38 @@ export interface ApiTeamInvite {
   teamPrivacy: "public" | "private";
   invitedBy: number;
   createdAt: string;
+}
+
+export interface ApiPointsRange {
+  id: number;
+  name: string;
+  minScore: number;
+  maxScore: number;
+  points: number;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiPointsTransaction {
+  id: number;
+  walletId: number;
+  userId: number;
+  amount: number;
+  type: string;
+  description: string | null;
+  metadata: Record<string, any> | null;
+  createdAt: string;
+}
+
+export interface ApiPointsWallet {
+  id: number;
+  userId: number;
+  balance: number;
+  createdAt: string;
+  updatedAt: string;
+  transactions: ApiPointsTransaction[];
 }
 
 export type NotificationType =

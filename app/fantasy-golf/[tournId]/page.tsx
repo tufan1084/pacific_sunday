@@ -17,13 +17,16 @@ const PICKS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 let fantasyCache: Record<string, { tournament: Tournament; tiers: ApiTier[]; timestamp: number }> = {};
 const FANTASY_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// DB stores dates in UTC; UI always renders in Pacific Time so a user in any
+// timezone sees the PGA's "tournament day" (Thu–Sun PT) consistently.
+const PT_OPTS: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "America/Los_Angeles" };
 function formatDateRange(start: string, end: string) {
   if (!start) return "";
   const s = new Date(start);
   const e = end ? new Date(end) : null;
-  const sStr = s.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const sStr = s.toLocaleDateString("en-US", PT_OPTS);
   if (!e) return sStr;
-  const eStr = e.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const eStr = e.toLocaleDateString("en-US", PT_OPTS);
   return `${sStr}–${eStr}`;
 }
 
@@ -55,10 +58,21 @@ type FantasyData = {
   tiersComputedAt: string | null;
 };
 
+type PlayerScoring = {
+  tier: string;
+  playerId: string;
+  playerName: string;
+  score: string;
+  points: number;
+};
+
 type PicksResponse = {
   picks: Record<string, string | null>;
   submittedAt: string;
   lockedAt: string | null;
+  pointsAwarded: number | null;
+  scoring: { playerScores: PlayerScoring[]; totalPoints: number } | null;
+  pointsCalculatedAt: string | null;
 };
 
 export default function TournamentPicksPage() {
@@ -77,6 +91,8 @@ export default function TournamentPicksPage() {
   const [nextTournament, setNextTournament] = useState<Tournament | null>(null);
   const [picksLoading, setPicksLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any>(null);
+  const [pointsAwarded, setPointsAwarded] = useState<number | null>(null);
+  const [scoring, setScoring] = useState<{ playerScores: PlayerScoring[]; totalPoints: number } | null>(null);
 
   // Reactive clock — ticks every 30s so the countdown stays live
   useEffect(() => {
@@ -135,11 +151,13 @@ export default function TournamentPicksPage() {
         const picks = d.picks || {};
         const submittedAt = d.submittedAt ?? null;
         const lockedAt = d.lockedAt ?? null;
-        
+
         setPicks(picks);
         setSavedAt(submittedAt);
         setLockedAt(lockedAt);
-        
+        setPointsAwarded(d.pointsAwarded);
+        setScoring(d.scoring);
+
         // Update cache
         picksCache[tournId] = { picks, submittedAt, lockedAt, timestamp: Date.now() };
       } catch {
@@ -433,8 +451,9 @@ export default function TournamentPicksPage() {
         </div>
       )}
 
-      {/* Live Leaderboard */}
-      {tournament?.status === "live" && leaderboard && Array.isArray(leaderboard) && leaderboard.length > 0 && (
+      {/* Your Points (completed tournaments) — shown above the final leaderboard
+          so users see their result first, before scanning the full board. */}
+      {tournament?.status === "completed" && pointsAwarded !== null && scoring && (
         <div style={{ marginTop: "clamp(16px, 3vw, 24px)" }}>
           <div
             style={{
@@ -444,7 +463,79 @@ export default function TournamentPicksPage() {
               marginBottom: "clamp(12px, 2vw, 16px)",
             }}
           >
-            Live Leaderboard
+            Your Points
+          </div>
+          <div
+            style={{
+              backgroundColor: "#13192A",
+              borderRadius: "5px",
+              padding: "clamp(16px, 2.5vw, 20px)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: "12px",
+                paddingBottom: "12px",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+                marginBottom: "12px",
+              }}
+            >
+              <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "13px" }}>
+                Total earned
+              </span>
+              <span style={{ color: "#E8C96A", fontSize: "22px", fontWeight: 700 }}>
+                +{pointsAwarded.toLocaleString()} pts
+              </span>
+            </div>
+            {scoring.playerScores.length === 0 ? (
+              <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "13px", textAlign: "center", padding: "8px 0" }}>
+                No player picks matched the final leaderboard.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: "8px 4px", textAlign: "left", color: "rgba(232,201,106,0.8)", fontSize: "11px", fontWeight: 600 }}>Tier</th>
+                      <th style={{ padding: "8px 4px", textAlign: "left", color: "rgba(232,201,106,0.8)", fontSize: "11px", fontWeight: 600 }}>Player</th>
+                      <th style={{ padding: "8px 4px", textAlign: "center", color: "rgba(232,201,106,0.8)", fontSize: "11px", fontWeight: 600 }}>Score</th>
+                      <th style={{ padding: "8px 4px", textAlign: "right", color: "rgba(232,201,106,0.8)", fontSize: "11px", fontWeight: 600 }}>Points</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scoring.playerScores.map((ps, idx) => (
+                      <tr key={idx} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                        <td style={{ padding: "10px 4px", color: "rgba(255,255,255,0.7)", fontSize: "12px" }}>{ps.tier}</td>
+                        <td style={{ padding: "10px 4px", color: "#FFF", fontSize: "13px", fontWeight: 500 }}>{ps.playerName}</td>
+                        <td style={{ padding: "10px 4px", textAlign: "center", color: "#FFF", fontSize: "13px" }}>{ps.score}</td>
+                        <td style={{ padding: "10px 4px", textAlign: "right", color: ps.points > 0 ? "#4ADE80" : "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 600 }}>
+                          {ps.points > 0 ? `+${ps.points}` : 0}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Leaderboard (live or final) */}
+      {(tournament?.status === "live" || tournament?.status === "completed") && leaderboard && Array.isArray(leaderboard) && leaderboard.length > 0 && (
+        <div style={{ marginTop: "clamp(16px, 3vw, 24px)" }}>
+          <div
+            style={{
+              fontSize: "clamp(16px, 2.5vw, 20px)",
+              color: "#E8C96A",
+              fontWeight: 600,
+              marginBottom: "clamp(12px, 2vw, 16px)",
+            }}
+          >
+            {tournament.status === "live" ? "Live Leaderboard" : "Final Leaderboard"}
           </div>
           <div
             style={{
