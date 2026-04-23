@@ -27,10 +27,10 @@ export default function CommunityFilters({
   const teamRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<HTMLDivElement>(null);
 
-  const allOwners = { name: ALL_OWNERS, privacy: null as null | "public" | "private" };
+  const allOwners = { name: ALL_OWNERS, privacy: null as null | "public" | "private", imageUrl: null as string | null };
   const teamOptions = [
     allOwners,
-    ...teams.map(t => ({ name: t.name, privacy: t.privacy as "public" | "private" })),
+    ...teams.map(t => ({ name: t.name, privacy: t.privacy as "public" | "private", imageUrl: t.imageUrl })),
   ];
 
   useEffect(() => {
@@ -66,9 +66,42 @@ export default function CommunityFilters({
       : <IoLockClosedOutline size={size} color="#FFFFFF" />;
   };
 
+  // Team avatar (or privacy icon fallback) rendered left of the team name.
+  const teamThumb = (imageUrl: string | null | undefined, privacy: "public" | "private" | null, size = 22) => {
+    if (imageUrl) {
+      return (
+        <span style={{
+          width: size, height: size, borderRadius: "4px",
+          overflow: "hidden", flexShrink: 0,
+          backgroundColor: "#060D1F",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Image
+            src={imageUrl}
+            alt=""
+            width={size}
+            height={size}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            unoptimized
+          />
+        </span>
+      );
+    }
+    return (
+      <span style={{
+        width: size, height: size, borderRadius: "4px", flexShrink: 0,
+        backgroundColor: "rgba(232,201,106,0.12)",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {iconFor(privacy, Math.round(size * 0.64))}
+      </span>
+    );
+  };
+
   const activeTeam = teams.find(t => t.name === activeFilter);
   const activePrivacy: "public" | "private" | null =
     activeFilter === ALL_OWNERS ? null : activeTeam?.privacy ?? null;
+  const activeImageUrl = activeFilter === ALL_OWNERS ? null : activeTeam?.imageUrl ?? null;
 
   const buttonStyle: React.CSSProperties = {
     display: "flex",
@@ -127,7 +160,7 @@ export default function CommunityFilters({
           style={buttonStyle}
         >
           <span className="flex items-center gap-2" style={{ minWidth: 0 }}>
-            {iconFor(activePrivacy, 14)}
+            {teamThumb(activeImageUrl, activePrivacy, 22)}
             <span
               style={{
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -141,7 +174,7 @@ export default function CommunityFilters({
 
         {teamOpen && (
           <div style={menuStyle}>
-            {teamOptions.map(({ name, privacy }) => {
+            {teamOptions.map(({ name, privacy, imageUrl }) => {
               const isActive = activeFilter === name;
               return (
                 <button
@@ -149,7 +182,7 @@ export default function CommunityFilters({
                   onClick={() => { onFilterChange(name); setTeamOpen(false); }}
                   style={menuItem(isActive)}
                 >
-                  {iconFor(privacy, 14)}
+                  {teamThumb(imageUrl, privacy, 22)}
                   <span
                     style={{
                       flex: 1, minWidth: 0,

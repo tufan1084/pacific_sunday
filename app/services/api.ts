@@ -189,10 +189,27 @@ export const api = {
   teams: {
     list: () => fetchApi<{ teams: ApiTeam[] }>("/teams"),
     get: (teamId: number) => fetchApi<{ team: ApiTeamDetail }>(`/teams/${teamId}`),
-    create: (data: { name: string; description?: string; privacy: "public" | "private"; memberIds?: number[] }) =>
+    create: (data: { name: string; description?: string; imageUrl?: string | null; privacy: "public" | "private"; memberIds?: number[] }) =>
       fetchApi<{ team: ApiTeam }>("/teams", { method: "POST", body: JSON.stringify(data) }),
-    update: (teamId: number, data: { name?: string; description?: string; privacy?: "public" | "private" }) =>
+    update: (teamId: number, data: { name?: string; description?: string; imageUrl?: string | null; privacy?: "public" | "private" }) =>
       fetchApi<{ team: ApiTeam }>(`/teams/${teamId}`, { method: "PUT", body: JSON.stringify(data) }),
+    uploadImage: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const token = typeof window !== "undefined" ? localStorage.getItem("ps_token") : null;
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/teams/upload-image`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+      return (await response.json()) as { success: boolean; data?: { imageUrl: string }; message?: string };
+    },
     delete: (teamId: number) =>
       fetchApi(`/teams/${teamId}`, { method: "DELETE" }),
     join: (teamId: number) =>
@@ -290,6 +307,7 @@ export interface ApiTeam {
   id: number;
   name: string;
   description: string | null;
+  imageUrl: string | null;
   privacy: "public" | "private";
   creatorId: number;
   memberCount: number;
@@ -338,7 +356,8 @@ export type NotificationType =
   | "TEAM_JOIN_APPROVED"
   | "TEAM_JOIN_REJECTED"
   | "TEAM_ROLE_CHANGED"
-  | "TEAM_REMOVED";
+  | "TEAM_REMOVED"
+  | "TEAM_POST_CREATED";
 
 export interface ApiNotification {
   id: number;

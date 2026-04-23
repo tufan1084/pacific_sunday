@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IoEarthOutline, IoLockClosedOutline, IoSettingsOutline, IoPersonAddOutline, IoNotificationsOutline } from "react-icons/io5";
+import Image from "next/image";
+import { IoEarthOutline, IoLockClosedOutline, IoSettingsOutline, IoPersonAddOutline, IoNotificationsOutline, IoPeopleOutline } from "react-icons/io5";
 import { api } from "@/app/services/api";
 import type { Team, TeamMember } from "@/app/types/community";
 
@@ -107,20 +108,34 @@ export default function TeamPanel({ activeTeam, onViewAll, onJoin, onLeave, refr
         fontFamily: "var(--font-poppins), sans-serif",
       }}
     >
-      <div className="flex items-center justify-between" style={{ paddingBottom: "14px", paddingTop: "4px" }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
+      <div className="flex items-center justify-between" style={{ paddingBottom: "14px", paddingTop: "4px", gap: "12px" }}>
+        <div className="flex items-center gap-3" style={{ minWidth: 0, flex: 1 }}>
           <div style={{
-            fontSize: "15px", color: "#E8C96A", fontWeight: 500,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            width: "40px", height: "40px", borderRadius: "6px",
+            backgroundColor: activeTeam.imageUrl ? "#060D1F" : "rgba(232,201,106,0.12)",
+            overflow: "hidden", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            {activeTeam.name}
+            {activeTeam.imageUrl ? (
+              <Image src={activeTeam.imageUrl} alt="" width={40} height={40} style={{ width: "100%", height: "100%", objectFit: "cover" }} unoptimized />
+            ) : (
+              <IoPeopleOutline size={20} color="#E8C96A" />
+            )}
           </div>
-          <div className="flex items-center gap-1" style={{ color: "#888", fontSize: "11px", marginTop: "2px" }}>
-            {activeTeam.privacy === "public"
-              ? <><IoEarthOutline size={11} /><span>Public</span></>
-              : <><IoLockClosedOutline size={11} /><span>Private</span></>
-            }
-            <span>· {activeTeam.memberCount} members</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{
+              fontSize: "15px", color: "#E8C96A", fontWeight: 500,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {activeTeam.name}
+            </div>
+            <div className="flex items-center gap-1" style={{ color: "#888", fontSize: "11px", marginTop: "2px" }}>
+              {activeTeam.privacy === "public"
+                ? <><IoEarthOutline size={11} /><span>Public</span></>
+                : <><IoLockClosedOutline size={11} /><span>Private</span></>
+              }
+              <span>· {activeTeam.memberCount} members</span>
+            </div>
           </div>
         </div>
         {activeTeam.role === "admin" && (
@@ -171,10 +186,14 @@ export default function TeamPanel({ activeTeam, onViewAll, onJoin, onLeave, refr
                 width: "34px", height: "34px", borderRadius: "5px",
                 backgroundColor: "#060D1F", display: "flex", alignItems: "center",
                 justifyContent: "center", fontSize: "10px", fontWeight: 700,
-                color: "#E8C96A", flexShrink: 0,
+                color: "#E8C96A", flexShrink: 0, overflow: "hidden",
               }}
             >
-              {m.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+              {m.avatarUrl ? (
+                <Image src={m.avatarUrl} alt="" width={34} height={34} style={{ width: "100%", height: "100%", objectFit: "cover" }} unoptimized />
+              ) : (
+                m.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+              )}
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ color: "#E8C96A", fontWeight: 500, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

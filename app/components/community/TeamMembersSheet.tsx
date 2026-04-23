@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { IoClose, IoEarthOutline, IoLockClosedOutline, IoSearch, IoSettingsOutline, IoPersonAddOutline, IoNotificationsOutline } from "react-icons/io5";
 import { api, ApiJoinRequest } from "@/app/services/api";
 import type { Team, TeamMember } from "@/app/types/community";
@@ -367,10 +368,14 @@ export default function TeamMembersSheet({ team, onClose, onJoin, onLeave, refre
                     width: "32px", height: "32px", borderRadius: "5px",
                     backgroundColor: "#060D1F", display: "flex", alignItems: "center",
                     justifyContent: "center", fontSize: "10px", fontWeight: 700,
-                    color: "#E8C96A", flexShrink: 0,
+                    color: "#E8C96A", flexShrink: 0, overflow: "hidden",
                   }}
                 >
-                  {m.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                  {m.avatarUrl ? (
+                    <Image src={m.avatarUrl} alt="" width={32} height={32} style={{ width: "100%", height: "100%", objectFit: "cover" }} unoptimized />
+                  ) : (
+                    m.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: "#E8C96A", fontSize: "13px", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "6px" }}>

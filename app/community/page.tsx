@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import { IoPeopleOutline } from "react-icons/io5";
 import CommunityHeader from "@/app/components/community/CommunityHeader";
@@ -37,15 +37,18 @@ function postTagSlugs(post: any): string[] {
 }
 
 export default function CommunityPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialTeam = searchParams?.get("team") || ALL_OWNERS;
+  const initialTab = searchParams?.get("tab") || "All Post";
 
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState<Team[]>([]);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>(initialTeam);
-  const [activeTab, setActiveTab] = useState<string>("All Post");
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
 
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [showMembersSheet, setShowMembersSheet] = useState(false);
@@ -148,6 +151,18 @@ export default function CommunityPage() {
 
   useEffect(() => { fetchTags(); }, [fetchTags]);
 
+  // Mirror active team/tab into the URL so refresh preserves the selection.
+  // Defaults (All Owners / All Post) are omitted to keep the URL clean.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (activeFilter && activeFilter !== ALL_OWNERS) params.set("team", activeFilter);
+    if (activeTab && activeTab !== "All Post") params.set("tab", activeTab);
+    const qs = params.toString();
+    const next = qs ? `${pathname}?${qs}` : pathname;
+    const current = `${pathname}${typeof window !== "undefined" ? window.location.search : ""}`;
+    if (next !== current) router.replace(next);
+  }, [activeFilter, activeTab, pathname, router]);
+
   // Re-fetch posts when active team changes
   useEffect(() => {
     setLoading(true);
@@ -214,13 +229,14 @@ export default function CommunityPage() {
       const memberIds: number[] = Array.isArray(payload?.memberIds) ? payload.memberIds : [];
       const isMember = currentUserId > 0 && memberIds.includes(currentUserId);
 
-      // Private teams are only visible to their members — skip for everyone else.
-      if (payload.privacy === "private" && !isMember) return;
+      // Dropdown is "my teams" only — skip unless the current user is in the member list.
+      if (!isMember) return;
 
       const team: Team = {
         id: payload.id,
         name: payload.name,
         description: payload.description ?? null,
+        imageUrl: payload.imageUrl ?? null,
         privacy: payload.privacy,
         creatorId: payload.creatorId,
         memberCount: payload.memberCount ?? memberIds.length,
@@ -232,15 +248,24 @@ export default function CommunityPage() {
     });
 
     socket.on("team:memberChanged", ({ teamId, memberCount, userId, action }) => {
+      const isSelf = userId === currentUserId;
+
+      // If I just joined a team that isn't in my dropdown yet (e.g. a public
+      // team I joined via search), refetch so it appears.
+      if (isSelf && action === "joined" && !teamsRef.current.some(t => t.id === teamId)) {
+        fetchTeams();
+        setMembersRefreshToken(n => n + 1);
+        return;
+      }
+
       setTeams(prev => prev.map(t => {
         if (t.id !== teamId) return t;
-        const isSelf = userId === currentUserId;
-        
+
         // If current user was removed, remove team from list
         if (isSelf && action === "removed") {
           return null; // Will be filtered out
         }
-        
+
         return {
           ...t,
           memberCount,
@@ -364,7 +389,15 @@ export default function CommunityPage() {
     willChange: isLg ? "auto" : "transform",
   };
 
+  // Apply sticky directly to the grid cell (not an inner wrapper) with
+  // align-self:start so the cell shrinks to its own content instead of
+  // stretching to the feed's height. Otherwise, when the feed is short the
+  // cell has no sticking range and the whole sidebar scrolls away.
+  // maxHeight + overflowY keep the panel inside the viewport when its
+  // combined content is taller than the screen.
   const rightStickyStyle: React.CSSProperties = {
+    minWidth: 0,
+    alignSelf: "start",
     position: "sticky",
     top: "-20px",
     zIndex: 20,
@@ -374,6 +407,8 @@ export default function CommunityPage() {
     display: "flex",
     flexDirection: "column",
     gap: "16px",
+    maxHeight: "calc(100vh + 20px)",
+    overflowY: "auto",
   };
 
   return (
@@ -451,29 +486,27 @@ export default function CommunityPage() {
 
         {/* RIGHT COLUMN: search + sidebar + status (all sticky). Desktop only. */}
         {isLg && (
-          <div style={{ minWidth: 0 }}>
-            <div style={rightStickyStyle}>
-              <GlobalSearchBar />
-              {showMembersSheet && activeTeam ? (
-                <TeamMembersSheet
-                  team={activeTeam}
-                  onClose={() => { setShowMembersSheet(false); setMembersSheetView("members"); }}
-                  onJoin={handleJoin}
-                  onLeave={handleLeave}
-                  refreshToken={membersRefreshToken}
-                  initialView={membersSheetView}
-                />
-              ) : (
-                <TeamPanel
-                  activeTeam={activeTeam}
-                  onViewAll={(view) => { setMembersSheetView(view || "members"); setShowMembersSheet(true); }}
-                  onJoin={handleJoin}
-                  onLeave={handleLeave}
-                  refreshToken={membersRefreshToken}
-                />
-              )}
-              <CommunityStatus stats={COMMUNITY_STATS} />
-            </div>
+          <div style={rightStickyStyle}>
+            <GlobalSearchBar />
+            {showMembersSheet && activeTeam ? (
+              <TeamMembersSheet
+                team={activeTeam}
+                onClose={() => { setShowMembersSheet(false); setMembersSheetView("members"); }}
+                onJoin={handleJoin}
+                onLeave={handleLeave}
+                refreshToken={membersRefreshToken}
+                initialView={membersSheetView}
+              />
+            ) : (
+              <TeamPanel
+                activeTeam={activeTeam}
+                onViewAll={(view) => { setMembersSheetView(view || "members"); setShowMembersSheet(true); }}
+                onJoin={handleJoin}
+                onLeave={handleLeave}
+                refreshToken={membersRefreshToken}
+              />
+            )}
+            <CommunityStatus stats={COMMUNITY_STATS} />
           </div>
         )}
       </div>

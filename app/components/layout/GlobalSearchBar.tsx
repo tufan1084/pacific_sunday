@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { FiSearch, FiUser, FiUsers, FiLock, FiGlobe } from "react-icons/fi";
 import { api, ApiSearchUser, ApiTeam } from "@/app/services/api";
 
@@ -50,8 +51,9 @@ export default function GlobalSearchBar() {
   const goToTeam = (team: ApiTeam) => {
     setOpen(false);
     setQ("");
-    // Private non-member → preview page; otherwise community with filter
-    if (team.privacy === "private" && !team.isMember) {
+    // Non-members (public or private) see the preview/Join page.
+    // Members jump straight into the team feed in community.
+    if (!team.isMember) {
       router.push(`/team/${team.id}`);
     } else {
       router.push(`/community?team=${encodeURIComponent(team.name)}`);
@@ -130,8 +132,11 @@ export default function GlobalSearchBar() {
                     fontFamily: "inherit",
                   }}
                 >
-                  <div style={{ width: "30px", height: "30px", borderRadius: "5px", background: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {t.privacy === "private" ? <FiLock size={14} /> : <FiGlobe size={14} />}
+                  <div style={{ width: "30px", height: "30px", borderRadius: "5px", background: "#060D1F", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {t.imageUrl
+                      ? <Image src={t.imageUrl} alt="" width={30} height={30} style={{ width: "100%", height: "100%", objectFit: "cover" }} unoptimized />
+                      : (t.privacy === "private" ? <FiLock size={14} /> : <FiGlobe size={14} />)
+                    }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>

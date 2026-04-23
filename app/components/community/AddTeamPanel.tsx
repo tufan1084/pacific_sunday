@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IoClose, IoEarthOutline, IoLockClosedOutline, IoSearch } from "react-icons/io5";
+import Image from "next/image";
+import { IoClose, IoEarthOutline, IoLockClosedOutline, IoSearch, IoImageOutline } from "react-icons/io5";
 import { FiUserPlus, FiCheck } from "react-icons/fi";
 import { api } from "@/app/services/api";
 import { useToast } from "@/app/context/ToastContext";
@@ -22,6 +23,8 @@ export default function AddTeamPanel({ onClose, onCreated }: AddTeamPanelProps) 
   const { showToast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [privacy, setPrivacy] = useState<"public" | "private">("public");
   const [invited, setInvited] = useState<SearchUser[]>([]);
   const [query, setQuery] = useState("");
@@ -29,6 +32,7 @@ export default function AddTeamPanel({ onClose, onCreated }: AddTeamPanelProps) 
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const searchTimer = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!query || query.trim().length < 2) {
@@ -66,6 +70,36 @@ export default function AddTeamPanel({ onClose, onCreated }: AddTeamPanelProps) 
     setInvited(prev => prev.filter(u => u.id !== id));
   };
 
+  const handlePickImage = () => {
+    if (submitting || uploadingImage) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // so picking the same file twice still fires change
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("Image must be under 10 MB", "error");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const res = await api.teams.uploadImage(file);
+      if (res.success && res.data?.imageUrl) {
+        setImageUrl(res.data.imageUrl);
+      } else {
+        showToast(res.message || "Could not upload image", "error");
+      }
+    } catch {
+      showToast("Could not upload image", "error");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const clearImage = () => setImageUrl(null);
+
   const handleSubmit = async () => {
     if (name.trim().length < 3) {
       showToast("Team name must be at least 3 characters", "error");
@@ -76,6 +110,7 @@ export default function AddTeamPanel({ onClose, onCreated }: AddTeamPanelProps) 
       const res = await api.teams.create({
         name: name.trim(),
         description: description.trim() || undefined,
+        imageUrl: imageUrl || undefined,
         privacy,
         memberIds: invited.map(u => u.id),
       });
@@ -116,6 +151,73 @@ export default function AddTeamPanel({ onClose, onCreated }: AddTeamPanelProps) 
         >
           <IoClose size={22} />
         </button>
+      </div>
+
+      <label style={labelStyle}>Team image (optional)</label>
+      <div className="flex items-center gap-3" style={{ marginBottom: "12px" }}>
+        <button
+          type="button"
+          onClick={handlePickImage}
+          disabled={submitting || uploadingImage}
+          style={{
+            width: "64px",
+            height: "64px",
+            borderRadius: "8px",
+            backgroundColor: "#060D1F",
+            border: "1px dashed rgba(232,201,106,0.4)",
+            color: "#888",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: submitting || uploadingImage ? "not-allowed" : "pointer",
+            overflow: "hidden",
+            padding: 0,
+            flexShrink: 0,
+            position: "relative",
+          }}
+          aria-label="Upload team image"
+        >
+          {imageUrl ? (
+            <Image src={imageUrl} alt="Team image" width={64} height={64} style={{ width: "64px", height: "64px", objectFit: "cover" }} unoptimized />
+          ) : uploadingImage ? (
+            <span style={{ fontSize: "11px" }}>Uploading…</span>
+          ) : (
+            <IoImageOutline size={22} color="#E8C96A" />
+          )}
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: "#94A3B8", fontSize: "12px", lineHeight: 1.5 }}>
+            {imageUrl
+              ? "Click the image to replace it, or remove it below."
+              : "JPG / PNG / WebP, up to 10 MB. Shown next to the team name."}
+          </div>
+          {imageUrl && (
+            <button
+              type="button"
+              onClick={clearImage}
+              disabled={submitting || uploadingImage}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#F87171",
+                fontSize: "11px",
+                marginTop: "4px",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Remove image
+            </button>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+          onChange={handleImageSelected}
+          style={{ display: "none" }}
+        />
       </div>
 
       <label style={labelStyle}>Team name</label>

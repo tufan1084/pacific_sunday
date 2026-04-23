@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { FiLock, FiGlobe, FiArrowLeft } from "react-icons/fi";
 import { api, ApiTeamDetail } from "@/app/services/api";
 import { useToast } from "@/app/context/ToastContext";
@@ -107,9 +108,12 @@ export default function TeamPreviewPage() {
             width: "64px", height: "64px", borderRadius: "8px",
             backgroundColor: "#060D1F",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#E8C96A", flexShrink: 0,
+            color: "#E8C96A", flexShrink: 0, overflow: "hidden",
           }}>
-            {team.privacy === "private" ? <FiLock size={24} /> : <FiGlobe size={24} />}
+            {team.imageUrl
+              ? <Image src={team.imageUrl} alt="" width={64} height={64} style={{ width: "100%", height: "100%", objectFit: "cover" }} unoptimized />
+              : (team.privacy === "private" ? <FiLock size={24} /> : <FiGlobe size={24} />)
+            }
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: "#E8C96A", fontSize: "20px", fontWeight: 500, marginBottom: "4px" }}>

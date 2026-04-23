@@ -272,26 +272,68 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
     return `${Math.floor(seconds / 86400)}d ago`;
   }
 
+  const goToAuthor = () => { if (!isPublicView && postUserId && router) router.push(`/user/${postUserId}`); };
+  const authorClickable = !isPublicView && postUserId;
+
+  const divider = (
+    <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.06)" }} />
+  );
+
+  const actionBtnStyle: React.CSSProperties = {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    background: "none",
+    border: "none",
+    padding: "10px 0",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 500,
+    fontFamily: "inherit",
+    borderRadius: "6px",
+    transition: "background-color 0.15s ease",
+  };
+
   return (
-    <div
+    <article
       style={{
         backgroundColor: "#13192A",
-        borderRadius: "5px",
-        padding: "16px",
-        paddingRight: "clamp(16px, 3vw, 36px)",
+        borderRadius: "10px",
         marginBottom: "16px",
         fontFamily: "var(--font-poppins), sans-serif",
+        overflow: "hidden",
       }}
     >
-      <div className="flex items-start gap-3">
+      {/* Pinned strip */}
+      {isPinned && (
         <div
-          onClick={() => { if (!isPublicView && postUserId && router) router.push(`/user/${postUserId}`); }}
+          className="flex items-center gap-2"
           style={{
-            width: "38px", height: "38px", borderRadius: "5px",
+            padding: "8px 16px",
+            backgroundColor: "rgba(232,201,106,0.08)",
+            borderBottom: "1px solid rgba(232,201,106,0.15)",
+            color: "#E8C96A",
+            fontSize: "11.5px",
+            fontWeight: 500,
+          }}
+        >
+          <BsPinAngleFill size={11} />
+          <span>Pinned post</span>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-start gap-3" style={{ padding: "14px 16px 10px" }}>
+        <div
+          onClick={goToAuthor}
+          style={{
+            width: "44px", height: "44px", borderRadius: "8px",
             backgroundColor: "#060D1F", display: "flex", alignItems: "center",
-            justifyContent: "center", fontSize: "10px", fontWeight: 700,
+            justifyContent: "center", fontSize: "12px", fontWeight: 700,
             color: "#E8C96A", flexShrink: 0,
-            cursor: !isPublicView && postUserId ? "pointer" : "default",
+            cursor: authorClickable ? "pointer" : "default",
             overflow: "hidden",
           }}
         >
@@ -303,134 +345,187 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="flex items-start justify-between gap-2" style={{ marginBottom: "8px" }}>
-            <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5" style={{ minWidth: 0, flex: 1 }}>
-              <span
-                onClick={() => { if (!isPublicView && postUserId && router) router.push(`/user/${postUserId}`); }}
-                style={{
-                  color: "#E8C96A", fontWeight: 500, fontSize: "clamp(14px, 1.5vw, 16px)",
-                  cursor: !isPublicView && postUserId ? "pointer" : "default",
-                }}
-              >
-                {author}
-              </span>
-              {username && (
-                <span style={{ color: "#888888", fontSize: "13px", fontWeight: 400 }}>
-                  @{username}
-                </span>
-              )}
-              {isPinned && (
-                <span className="flex items-center gap-1" style={{ color: "#E8C96A", fontSize: "12px" }}>
-                  <BsPinAngleFill size={11} />
-                  <span>Pinned</span>
-                </span>
-              )}
-              <span style={{ color: "#888888", fontSize: "13px", fontWeight: 400 }}>
-                · {timeAgo}
-              </span>
-            </div>
-
-            <PostActionMenu
-              isOwner={isOwner}
-              isPinned={isPinned}
-              isSaved={isSaved}
-              open={menuOpen}
-              onToggle={() => setMenuOpen(!menuOpen)}
-              onClose={() => setMenuOpen(false)}
-              onPin={handlePin}
-              onDelete={handleDelete}
-              onShare={handleShare}
-              onReport={handleReport}
-              onBlock={handleBlock}
-              onSave={handleSave}
-              onCopyLink={handleCopyLink}
-            />
+          <div
+            onClick={goToAuthor}
+            style={{
+              color: "#E8C96A", fontWeight: 600, fontSize: "15px",
+              cursor: authorClickable ? "pointer" : "default",
+              lineHeight: 1.2,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}
+          >
+            {author}
           </div>
+          <div style={{ color: "#888", fontSize: "12px", marginTop: "3px", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+            {username && <span>@{username}</span>}
+            {username && <span>·</span>}
+            <span>{timeAgo}</span>
+          </div>
+        </div>
 
-          <p style={{ color: "#FFFFFF", fontSize: "14px", lineHeight: "1.6", fontWeight: 400, marginBottom: mediaUrls.length > 0 ? "12px" : "16px", wordBreak: "break-word" }}>
-            {post.content}
-          </p>
+        <PostActionMenu
+          isOwner={isOwner}
+          isPinned={isPinned}
+          isSaved={isSaved}
+          open={menuOpen}
+          onToggle={() => setMenuOpen(!menuOpen)}
+          onClose={() => setMenuOpen(false)}
+          onPin={handlePin}
+          onDelete={handleDelete}
+          onShare={handleShare}
+          onReport={handleReport}
+          onBlock={handleBlock}
+          onSave={handleSave}
+          onCopyLink={handleCopyLink}
+        />
+      </div>
 
-          {computedTags.length > 0 && (
-            <div className="flex flex-wrap gap-1" style={{ marginBottom: "12px" }}>
-              {computedTags.map((tag: string, i: number) => (
+      {/* Content */}
+      {post.content && (
+        <p style={{ color: "#FFFFFF", fontSize: "14px", lineHeight: "1.6", fontWeight: 400, padding: "0 16px", margin: 0, wordBreak: "break-word" }}>
+          {post.content}
+        </p>
+      )}
+
+      {computedTags.length > 0 && (
+        <div className="flex flex-wrap gap-1" style={{ padding: "10px 16px 0" }}>
+          {computedTags.map((tag: string, i: number) => (
+            <span
+              key={i}
+              style={{
+                fontSize: "11px", color: "#E8C96A",
+                backgroundColor: "rgba(232,201,106,0.1)",
+                padding: "3px 10px", borderRadius: "999px",
+              }}
+            >
+              #{tag.replace("_", " ")}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Full-bleed media */}
+      {mediaUrls.length > 0 && (
+        <div
+          style={{
+            marginTop: "12px",
+            display: "grid",
+            gridTemplateColumns: mediaUrls.length === 1 ? "1fr" : "repeat(2, 1fr)",
+            gap: "2px",
+            backgroundColor: "#060D1F",
+          }}
+        >
+          {mediaUrls.map((url: string, idx: number) => {
+            const isVideo = /\.(mp4|mov|avi|mkv|webm)(\?|$)/i.test(url) || url.includes("/video/");
+            const fullUrl = resolveMediaUrl(url);
+            return (
+              <div key={idx} style={{ position: "relative", overflow: "hidden", backgroundColor: "#000" }}>
+                {isVideo ? (
+                  <video src={fullUrl} controls style={{ width: "100%", height: "auto", display: "block", maxHeight: "520px" }} />
+                ) : (
+                  <img src={fullUrl} alt="Post media" style={{ width: "100%", height: "auto", display: "block", maxHeight: "520px", objectFit: "cover" }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Engagement summary (or breathing room above the divider when empty) */}
+      {!(currentLikes > 0 || commentsCount > 0 || shareCount > 0) && (
+        <div style={{ height: "12px" }} />
+      )}
+      {(currentLikes > 0 || commentsCount > 0 || shareCount > 0) && (
+        <div
+          className="flex items-center justify-between"
+          style={{ padding: "10px 16px 8px", color: "#888", fontSize: "12.5px" }}
+        >
+          <div className="flex items-center gap-1.5">
+            {currentLikes > 0 && (
+              <>
                 <span
-                  key={i}
                   style={{
-                    fontSize: "11px", color: "#E8C96A",
-                    backgroundColor: "rgba(232,201,106,0.1)",
-                    padding: "2px 8px", borderRadius: "999px",
+                    width: "18px", height: "18px", borderRadius: "999px",
+                    backgroundColor: "rgba(232,201,106,0.15)",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
-                  #{tag.replace("_", " ")}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="#E8C96A" stroke="#E8C96A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
                 </span>
-              ))}
-            </div>
-          )}
-
-          {mediaUrls.length > 0 && (
-            <div style={{ marginBottom: "16px", display: "grid", gridTemplateColumns: mediaUrls.length === 1 ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px" }}>
-              {mediaUrls.map((url: string, idx: number) => {
-                const isVideo = /\.(mp4|mov|avi|mkv|webm)(\?|$)/i.test(url) || url.includes("/video/");
-                const fullUrl = resolveMediaUrl(url);
-                return (
-                  <div key={idx} style={{ position: "relative", borderRadius: "5px", overflow: "hidden" }}>
-                    {isVideo ? (
-                      <video src={fullUrl} controls style={{ width: "100%", height: "auto", display: "block" }} />
-                    ) : (
-                      <img src={fullUrl} alt="Post media" style={{ width: "100%", height: "auto", display: "block" }} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="flex items-center gap-5 flex-wrap">
-            <button onClick={handleLike} disabled={liking} className="flex items-center gap-2" style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill={isLiked ? "#E8C96A" : "none"} stroke="#E8C96A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-              <span style={{ color: "#FFFFFF", fontSize: "14px" }}>{currentLikes}</span>
-            </button>
-
-            <button
-              onClick={() => setShowAllComments(!showAllComments)}
-              className="flex items-center gap-2"
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
-            >
-              <Image src="/icons/reply.svg" alt="Reply" width={22} height={22} />
-              <span style={{ color: "#FFFFFF", fontSize: "14px" }}>{commentsCount}</span>
-            </button>
-
-            <button
-              onClick={() => setShowShare(true)}
-              className="flex items-center gap-2"
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#E8C96A" }}
-              aria-label="Share"
-            >
-              <FiShare2 size={20} />
-              <span style={{ color: "#FFFFFF", fontSize: "14px" }}>{shareCount}</span>
-            </button>
+                <span>{currentLikes}</span>
+              </>
+            )}
           </div>
-
-          {showReport && (
-            <ReportPanel
-              postId={post.id}
-              onClose={() => setShowReport(false)}
-              onReported={handleReported}
-            />
-          )}
+          <div className="flex items-center gap-3">
+            {commentsCount > 0 && (
+              <button
+                onClick={() => setShowAllComments(!showAllComments)}
+                style={{ background: "none", border: "none", color: "#888", fontSize: "12.5px", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+              >
+                {commentsCount} {commentsCount === 1 ? "comment" : "comments"}
+              </button>
+            )}
+            {shareCount > 0 && <span>{shareCount} {shareCount === 1 ? "share" : "shares"}</span>}
+          </div>
         </div>
+      )}
+
+      {/* Action bar */}
+      <div style={{ padding: "0 8px" }}>
+        {divider}
+        <div className="flex items-stretch" style={{ padding: "4px 0" }}>
+          <button
+            onClick={handleLike}
+            disabled={liking}
+            style={{ ...actionBtnStyle, color: isLiked ? "#E8C96A" : "#94A3B8" }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill={isLiked ? "#E8C96A" : "none"} stroke={isLiked ? "#E8C96A" : "#94A3B8"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            <span>Like</span>
+          </button>
+          <button
+            onClick={() => setShowAllComments(!showAllComments)}
+            style={{ ...actionBtnStyle, color: "#94A3B8" }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+          >
+            <Image src="/icons/reply.svg" alt="" width={18} height={18} style={{ filter: "grayscale(1) brightness(0.7)" }} />
+            <span>Comment</span>
+          </button>
+          <button
+            onClick={() => setShowShare(true)}
+            style={{ ...actionBtnStyle, color: "#94A3B8" }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+          >
+            <FiShare2 size={18} />
+            <span>Share</span>
+          </button>
+        </div>
+        {divider}
       </div>
+
+      {showReport && (
+        <ReportPanel
+          postId={post.id}
+          onClose={() => setShowReport(false)}
+          onReported={handleReported}
+        />
+      )}
 
       {commentsCount > 0 && !showAllComments && (
         <button
           onClick={() => setShowAllComments(true)}
           style={{
             background: "none", border: "none", color: "#888888",
-            fontSize: "14px", cursor: "pointer",
-            marginTop: "12px", marginLeft: "50px", padding: 0,
+            fontSize: "13px", cursor: "pointer",
+            padding: "10px 16px 0", fontFamily: "inherit",
+            textAlign: "left", width: "100%",
           }}
         >
           View all {commentsCount} comments
@@ -442,8 +537,9 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
           onClick={() => setShowAllComments(false)}
           style={{
             background: "none", border: "none", color: "#888888",
-            fontSize: "14px", cursor: "pointer",
-            marginTop: "12px", marginLeft: "50px", padding: 0,
+            fontSize: "13px", cursor: "pointer",
+            padding: "10px 16px 0", fontFamily: "inherit",
+            textAlign: "left", width: "100%",
           }}
         >
           Hide comments
@@ -451,7 +547,7 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
       )}
 
       {showAllComments && (
-        <div style={{ marginTop: "12px", marginLeft: "50px", borderLeft: "1px solid #1E2A47", paddingLeft: "12px" }}>
+        <div style={{ padding: "10px 16px 0" }}>
           {loadingComments ? (
             <div style={{ color: "#888", fontSize: "12px", padding: "8px 0" }}>Loading...</div>
           ) : comments.length === 0 ? (
@@ -531,29 +627,54 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
         </div>
       )}
 
-      <div style={{ marginTop: "12px", marginLeft: "50px" }}>
+      <div style={{ padding: "10px 16px 14px" }}>
         {commentMediaPreview && (
           <div style={{ marginBottom: "8px", position: "relative", display: "inline-block" }}>
             {commentMedia?.type.startsWith("video/") ? (
-              <video src={commentMediaPreview} style={{ maxWidth: "200px", maxHeight: "150px", borderRadius: "4px" }} />
+              <video src={commentMediaPreview} style={{ maxWidth: "200px", maxHeight: "150px", borderRadius: "8px" }} />
             ) : (
-              <img src={commentMediaPreview} alt="Preview" style={{ maxWidth: "200px", maxHeight: "150px", borderRadius: "4px" }} />
+              <img src={commentMediaPreview} alt="Preview" style={{ maxWidth: "200px", maxHeight: "150px", borderRadius: "8px" }} />
             )}
             <button onClick={removeCommentMedia} style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "none", borderRadius: "50%", width: "20px", height: "20px", color: "#fff", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               ✕
             </button>
           </div>
         )}
-        <div style={{ display: "flex", gap: "6px", position: "relative" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1 }}>
-            <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Add a comment..." style={{ width: "100%", backgroundColor: "#060D1F", border: "1px solid #1E2A47", borderRadius: "4px", padding: "8px 36px 8px 10px", color: "#FFFFFF", fontSize: "12px" }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }} />
+            <input
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Write a comment..."
+              style={{
+                width: "100%", backgroundColor: "#060D1F",
+                border: "1px solid #1E2A47", borderRadius: "999px",
+                padding: "10px 40px 10px 14px",
+                color: "#FFFFFF", fontSize: "13px",
+                fontFamily: "inherit", outline: "none",
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
+            />
             <input type="file" accept="image/*,video/*" onChange={handleCommentMediaSelect} style={{ display: "none" }} id={`comment-media-${post.id}`} />
-            <label htmlFor={`comment-media-${post.id}`} style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", display: "flex", alignItems: "center", color: "#888888" }}>
-              <IoIosAttach size={20} />
+            <label htmlFor={`comment-media-${post.id}`} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", display: "flex", alignItems: "center", color: "#888888" }}>
+              <IoIosAttach size={18} />
             </label>
           </div>
-          <button onClick={handleAddComment} disabled={submittingComment || (!commentText.trim() && !commentMedia)} style={{ backgroundColor: "#E8C96A", color: "#060D1F", border: "none", borderRadius: "4px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", opacity: submittingComment || (!commentText.trim() && !commentMedia) ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <IoMdSend size={18} />
+          <button
+            onClick={handleAddComment}
+            disabled={submittingComment || (!commentText.trim() && !commentMedia)}
+            style={{
+              backgroundColor: "#E8C96A", color: "#060D1F",
+              border: "none", borderRadius: "999px",
+              width: "36px", height: "36px",
+              cursor: submittingComment || (!commentText.trim() && !commentMedia) ? "not-allowed" : "pointer",
+              opacity: submittingComment || (!commentText.trim() && !commentMedia) ? 0.5 : 1,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}
+            aria-label="Send comment"
+          >
+            <IoMdSend size={16} />
           </button>
         </div>
       </div>
@@ -586,6 +707,6 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
         confirmText="Hide"
         confirmColor="#EF4444"
       />
-    </div>
+    </article>
   );
 }

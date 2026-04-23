@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { io, Socket } from "socket.io-client";
-import { FiHeart, FiMessageCircle, FiUserPlus, FiUsers, FiCheck, FiX, FiArrowUp, FiUserMinus, FiCornerDownRight } from "react-icons/fi";
+import { FiHeart, FiMessageCircle, FiUserPlus, FiUsers, FiCheck, FiX, FiArrowUp, FiUserMinus, FiCornerDownRight, FiEdit3 } from "react-icons/fi";
 import { NotificationIcon } from "@/app/components/ui/Icons";
 import { api, ApiNotification, NotificationType, ApiTeamInvite } from "@/app/services/api";
 import { SOCKET_URL } from "@/app/lib/constants";
@@ -21,6 +21,7 @@ const ICON_FOR: Record<NotificationType, { icon: ReactElement; color: string }> 
   TEAM_JOIN_REJECTED: { icon: <FiX size={14} />,            color: "#F87171" },
   TEAM_ROLE_CHANGED:  { icon: <FiArrowUp size={14} />,      color: "#E8C96A" },
   TEAM_REMOVED:       { icon: <FiUserMinus size={14} />,    color: "#F87171" },
+  TEAM_POST_CREATED:  { icon: <FiEdit3 size={14} />,        color: "#E8C96A" },
 };
 
 function describe(n: ApiNotification): string {
@@ -38,6 +39,7 @@ function describe(n: ApiNotification): string {
     case "TEAM_JOIN_REJECTED": return `Your request to join ${team} was declined`;
     case "TEAM_ROLE_CHANGED":  return `You were promoted to ${(n.data as any)?.newRole || "admin"} in ${team}`;
     case "TEAM_REMOVED":       return `You were removed from ${team}`;
+    case "TEAM_POST_CREATED":  return `${actor} posted in ${team}${preview ? `: “${preview}”` : ""}`;
     default:                   return "New notification";
   }
 }

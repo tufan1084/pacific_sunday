@@ -7,6 +7,7 @@ export interface Team {
   id: number;
   name: string;
   description: string | null;
+  imageUrl: string | null;
   privacy: "public" | "private";
   creatorId: number;
   memberCount: number;
@@ -19,6 +20,7 @@ export interface TeamMember {
   id: number;
   username: string;
   name: string;
+  avatarUrl: string | null;
   role: "admin" | "member";
   joinedAt: string;
 }
