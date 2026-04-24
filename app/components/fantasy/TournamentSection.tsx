@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import type { Tournament, ApiTier } from "@/app/types/fantasy";
-import LockedPicksTable from "@/app/components/fantasy/LockedPicksTable";
+import type { Tournament } from "@/app/types/fantasy";
 
 // Shape of the /fantasy endpoint response (leaderboard is denormalized in DB JSONB)
 type FantasyLeaderboardRow = {
@@ -100,9 +99,6 @@ export default function TournamentSection({
   const [resultsLoading, setResultsLoading] = useState<string | null>(null);
   const [liveLeaderboards, setLiveLeaderboards] = useState<Record<string, CompletedResults>>({});
   const [liveLoading, setLiveLoading] = useState<Record<string, boolean>>({});
-  // Tiers + the current user's locked picks, per live tournament — used to render
-  // the "Your Locked Picks" panel directly in the live tab.
-  const [livePicksData, setLivePicksData] = useState<Record<string, { tiers: ApiTier[]; picks: Record<string, string | null> }>>({});
 
   // Track which upcoming tournaments have picks
   const [tournamentsWithPicks, setTournamentsWithPicks] = useState<Set<string>>(new Set());
@@ -145,9 +141,8 @@ export default function TournamentSection({
     fetchPicks();
   }, [nextUpcomingTournament]);
 
-  // Fetch live tournament data (leaderboard + tiers + the signed-in user's picks).
-  // Backend now returns `leaderboard` as a flat row array (or null), matching the
-  // detail-page contract. Picks fetch silently no-ops for unauthenticated users.
+  // Fetch live leaderboard + course name per live tournament. Backend returns
+  // `leaderboard` as a flat row array (or null), matching the detail-page contract.
   useEffect(() => {
     const fetchLiveData = async () => {
       if (live.length === 0) return;
@@ -161,24 +156,10 @@ export default function TournamentSection({
           if (res.success && res.data) {
             const d = res.data as {
               tournament: { courseName: string | null };
-              tiers: ApiTier[];
               leaderboard: FantasyLeaderboardRow[] | null;
             };
             const rows = Array.isArray(d.leaderboard) ? d.leaderboard : [];
             setLiveLeaderboards(prev => ({ ...prev, [tournament.tournId]: { courseName: d.tournament.courseName, rows } }));
-
-            // Pair the user's picks with the tier data so LockedPicksTable can resolve names.
-            try {
-              const picksRes = await api.golf.getPicks(tournament.tournId);
-              if (picksRes.success && picksRes.data?.picks) {
-                setLivePicksData(prev => ({
-                  ...prev,
-                  [tournament.tournId]: { tiers: d.tiers || [], picks: picksRes.data!.picks },
-                }));
-              }
-            } catch {
-              // Unauthenticated or no picks — skip the locked-picks panel silently.
-            }
           }
         } catch {
           // Silent fail
@@ -639,8 +620,6 @@ export default function TournamentSection({
                 {events.map((event) => {
                   const leaderboard = liveLeaderboards[event.tournId];
                   const isLoading = liveLoading[event.tournId];
-                  const picksData = livePicksData[event.tournId];
-                  const hasLockedPicks = picksData && Object.values(picksData.picks).some(Boolean);
 
                   return (
                     <React.Fragment key={event.tournId}>
@@ -735,22 +714,10 @@ export default function TournamentSection({
                               transition: "all 0.2s ease",
                             }}
                           >
-                            View Live
+                            View Picks
                           </button>
                         </td>
                       </tr>
-
-                      {/* Your Locked Picks — rendered in the live tab so users see
-                          their picks without drilling into the detail page. */}
-                      {hasLockedPicks && (
-                        <tr>
-                          <td colSpan={3} style={{ padding: 0, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <div style={{ padding: "16px" }}>
-                              <LockedPicksTable tiers={picksData!.tiers} picks={picksData!.picks} />
-                            </div>
-                          </td>
-                        </tr>
-                      )}
 
                       {/* Live Leaderboard Row — also shown while waiting for first tee so
                           users see the state instead of an invisible section. */}
@@ -768,23 +735,26 @@ export default function TournamentSection({
                                   Waiting for first tee off · leaderboard updates hourly once play begins
                                 </div>
                               ) : (
-                                <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto" }}>
+                                <div>
                                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-                                    <thead style={{ position: "sticky", top: 0, backgroundColor: "#13192A", zIndex: 1 }}>
+                                    <thead>
                                       <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                                         <th style={{ padding: "8px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Pos</th>
-                                        <th style={{ padding: "8px 8px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase", minWidth: "140px" }}>Player</th>
-                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Score</th>
-                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Thru</th>
-                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Today</th>
+                                        <th style={{ padding: "8px 8px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase", minWidth: "140px" }}>Name</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R1</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R2</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R3</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R4</th>
+                                        <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Total</th>
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {leaderboard.rows.slice(0, 15).map((player, i) => {
+                                      {leaderboard.rows.map((player, i) => {
                                         const flag = getCountryFlag(player.country);
                                         const isLeader = i === 0;
+                                        const round = (n: number) => player.rounds?.[n] || "-";
                                         return (
-                                          <tr key={player.playerId || i} style={{ borderBottom: i < 14 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                                          <tr key={player.playerId || i} style={{ borderBottom: i < leaderboard.rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
                                             <td style={{ padding: "10px 4px", color: isLeader ? "#4ADE80" : "rgba(255,255,255,0.5)", fontWeight: isLeader ? 600 : 400, fontSize: "12px" }}>
                                               {player.position}
                                             </td>
@@ -797,23 +767,23 @@ export default function TournamentSection({
                                                 {flag && <span style={{ fontSize: "11px" }}>{flag}</span>}
                                               </div>
                                             </td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>{round(0)}</td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>{round(1)}</td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>{round(2)}</td>
+                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>{round(3)}</td>
                                             <td style={{ padding: "10px 6px", textAlign: "center", color: getScoreColor(player), fontWeight: 600 }}>
                                               {player.score}
-                                            </td>
-                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "11px" }}>
-                                              {player.thru}
-                                            </td>
-                                            <td style={{ padding: "10px 6px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>
-                                              {player.currentRoundScore || "-"}
                                             </td>
                                           </tr>
                                         );
                                       })}
                                     </tbody>
                                   </table>
-                                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", textAlign: "center", marginTop: "12px" }}>
-                                    Showing top 15 · {leaderboard.courseName}
-                                  </div>
+                                  {leaderboard.courseName && (
+                                    <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", textAlign: "center", marginTop: "12px" }}>
+                                      {leaderboard.courseName}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -833,8 +803,6 @@ export default function TournamentSection({
           {events.map((event) => {
             const leaderboard = liveLeaderboards[event.tournId];
             const isLoading = liveLoading[event.tournId];
-            const picksData = livePicksData[event.tournId];
-            const hasLockedPicks = picksData && Object.values(picksData.picks).some(Boolean);
 
             return (
               <div key={event.tournId} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -907,14 +875,9 @@ export default function TournamentSection({
                       flexShrink: 0,
                     }}
                   >
-                    View Live
+                    View Picks
                   </button>
                 </div>
-
-                {/* Your Locked Picks (mobile) — shown inline on the live tab. */}
-                {hasLockedPicks && (
-                  <LockedPicksTable tiers={picksData!.tiers} picks={picksData!.picks} />
-                )}
 
                 {/* Live Leaderboard */}
                 {isLoading && (
@@ -932,23 +895,26 @@ export default function TournamentSection({
                 {!isLoading && leaderboard && leaderboard.rows.length > 0 && (
                   <div style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "5px", padding: "12px" }}>
                     <div style={{ fontSize: "13px", color: "#E8C96A", fontWeight: 600, marginBottom: "8px" }}>Live Leaderboard</div>
-                    <div style={{ overflowX: "auto", maxHeight: "300px", overflowY: "auto" }}>
+                    <div>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
-                        <thead style={{ position: "sticky", top: 0, backgroundColor: "#13192A", zIndex: 1 }}>
+                        <thead>
                           <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                             <th style={{ padding: "6px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Pos</th>
-                            <th style={{ padding: "6px 6px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase", minWidth: "100px" }}>Player</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Score</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Thru</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Today</th>
+                            <th style={{ padding: "6px 6px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase", minWidth: "100px" }}>Name</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R1</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R2</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R3</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R4</th>
+                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Total</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {leaderboard.rows.slice(0, 10).map((player, i) => {
+                          {leaderboard.rows.map((player, i) => {
                             const flag = getCountryFlag(player.country);
                             const isLeader = i === 0;
+                            const round = (n: number) => player.rounds?.[n] || "-";
                             return (
-                              <tr key={player.playerId || i} style={{ borderBottom: i < 9 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                              <tr key={player.playerId || i} style={{ borderBottom: i < leaderboard.rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
                                 <td style={{ padding: "8px 4px", color: isLeader ? "#E8C96A" : "rgba(255,255,255,0.5)", fontWeight: isLeader ? 600 : 400, fontSize: "11px" }}>
                                   {player.position}
                                 </td>
@@ -960,14 +926,12 @@ export default function TournamentSection({
                                     {flag && <span style={{ fontSize: "10px", flexShrink: 0 }}>{flag}</span>}
                                   </div>
                                 </td>
+                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(0)}</td>
+                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(1)}</td>
+                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(2)}</td>
+                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(3)}</td>
                                 <td style={{ padding: "8px 4px", textAlign: "center", color: getScoreColor(player), fontWeight: 600, fontSize: "11px" }}>
                                   {player.score}
-                                </td>
-                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "10px" }}>
-                                  {player.thru}
-                                </td>
-                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>
-                                  {player.currentRoundScore || "-"}
                                 </td>
                               </tr>
                             );

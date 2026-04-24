@@ -524,8 +524,8 @@ export default function TournamentPicksPage() {
         </div>
       )}
 
-      {/* Leaderboard (live or final) */}
-      {(tournament?.status === "live" || tournament?.status === "completed") && leaderboard && Array.isArray(leaderboard) && leaderboard.length > 0 && (
+      {/* Final Leaderboard (completed tournaments only — live leaderboard lives on the Live tab) */}
+      {tournament?.status === "completed" && leaderboard && Array.isArray(leaderboard) && leaderboard.length > 0 && (
         <div style={{ marginTop: "clamp(16px, 3vw, 24px)" }}>
           <div
             style={{
@@ -535,7 +535,7 @@ export default function TournamentPicksPage() {
               marginBottom: "clamp(12px, 2vw, 16px)",
             }}
           >
-            {tournament.status === "live" ? "Live Leaderboard" : "Final Leaderboard"}
+            Final Leaderboard
           </div>
           <div
             style={{
