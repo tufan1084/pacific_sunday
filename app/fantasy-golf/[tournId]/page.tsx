@@ -544,15 +544,15 @@ export default function TournamentPicksPage() {
               overflow: "hidden",
             }}
           >
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "480px" }}>
                 <thead>
                   <tr style={{ backgroundColor: "rgba(232,201,106,0.1)" }}>
-                    <th style={{ padding: "12px", textAlign: "left", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Pos</th>
-                    <th style={{ padding: "12px", textAlign: "left", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Player</th>
-                    <th style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Score</th>
-                    <th style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Thru</th>
-                    <th style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Today</th>
+                    <th style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "left", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Pos</th>
+                    <th style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "left", color: "#E8C96A", fontSize: "12px", fontWeight: 600, minWidth: "120px" }}>Player</th>
+                    <th style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Score</th>
+                    <th style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Thru</th>
+                    <th style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "center", color: "#E8C96A", fontSize: "12px", fontWeight: 600 }}>Today</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -564,17 +564,17 @@ export default function TournamentPicksPage() {
                         backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
                       }}
                     >
-                      <td style={{ padding: "12px", color: "#FFF", fontSize: "13px" }}>{player.position || "-"}</td>
-                      <td style={{ padding: "12px", color: "#FFF", fontSize: "13px", fontWeight: 500 }}>
+                      <td style={{ padding: "clamp(8px, 2vw, 12px)", color: "#FFF", fontSize: "13px" }}>{player.position || "-"}</td>
+                      <td style={{ padding: "clamp(8px, 2vw, 12px)", color: "#FFF", fontSize: "13px", fontWeight: 500 }}>
                         {player.firstName} {player.lastName}
                       </td>
-                      <td style={{ padding: "12px", textAlign: "center", color: "#E8C96A", fontSize: "13px", fontWeight: 600 }}>
+                      <td style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "center", color: "#E8C96A", fontSize: "13px", fontWeight: 600 }}>
                         {player.totalScore || "E"}
                       </td>
-                      <td style={{ padding: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
+                      <td style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
                         {player.thru || "-"}
                       </td>
-                      <td style={{ padding: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
+                      <td style={{ padding: "clamp(8px, 2vw, 12px)", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "12px" }}>
                         {player.today || "-"}
                       </td>
                     </tr>

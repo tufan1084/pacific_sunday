@@ -121,6 +121,16 @@ export default function TournamentSection({
 
   // Track which upcoming tournaments have picks
   const [tournamentsWithPicks, setTournamentsWithPicks] = useState<Set<string>>(new Set());
+  // Mobile leaderboard: track which player cards are expanded (to show R1–R4).
+  // Keyed by `${tournId}:${playerId-or-index}` so two tournaments don't collide.
+  const [expandedLbRows, setExpandedLbRows] = useState<Set<string>>(new Set());
+  const toggleLbRow = (key: string) => {
+    setExpandedLbRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
   const [picksLoading, setPicksLoading] = useState(true);
 
   // Find the next upcoming tournament (earliest start date)
@@ -248,16 +258,17 @@ export default function TournamentSection({
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 style={{
-                  padding: "8px 16px",
+                  padding: "clamp(6px, 1.2vw, 8px) clamp(10px, 2.5vw, 16px)",
                   borderRadius: "5px",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: "13px",
+                  fontSize: "clamp(11px, 1.5vw, 13px)",
                   fontWeight: 500,
                   fontFamily: "var(--font-poppins), sans-serif",
                   backgroundColor: isActive ? "#E8C96A" : "rgba(255,255,255,0.06)",
                   color: isActive ? "#060D1F" : "rgba(255,255,255,0.5)",
                   transition: "all 0.2s ease",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {TAB_LABELS[tab]}
@@ -566,11 +577,11 @@ export default function TournamentSection({
                   disabled={disabled}
                   onClick={() => !disabled && onSelect(event.tournId)}
                   style={{
-                    padding: "8px 16px",
+                    padding: "6px clamp(10px, 3vw, 14px)",
                     borderRadius: "5px",
                     border: "none",
                     cursor: disabled ? "not-allowed" : "pointer",
-                    fontSize: "12px",
+                    fontSize: "clamp(11px, 2vw, 12px)",
                     fontWeight: 600,
                     fontFamily: "var(--font-poppins), sans-serif",
                     backgroundColor: disabled ? "rgba(255,255,255,0.08)" : buttonColor,
@@ -781,7 +792,7 @@ export default function TournamentSection({
                                     <thead>
                                       <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                                         <th style={{ padding: "8px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>Pos</th>
-                                        <th style={{ padding: "8px 8px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase", minWidth: "140px" }}>Name</th>
+                                        <th style={{ padding: "8px 8px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase", minWidth: "120px" }}>Name</th>
                                         <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R1</th>
                                         <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R2</th>
                                         <th style={{ padding: "8px 6px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" }}>R3</th>
@@ -902,11 +913,11 @@ export default function TournamentSection({
                   <button
                     onClick={() => onSelect(event.tournId)}
                     style={{
-                      padding: "8px 16px",
+                      padding: "6px clamp(10px, 3vw, 14px)",
                       borderRadius: "5px",
                       border: "none",
                       cursor: "pointer",
-                      fontSize: "12px",
+                      fontSize: "clamp(11px, 2vw, 12px)",
                       fontWeight: 600,
                       fontFamily: "var(--font-poppins), sans-serif",
                       backgroundColor: "#4ADE80",
@@ -935,51 +946,99 @@ export default function TournamentSection({
 
                 {!isLoading && leaderboard && leaderboard.rows.length > 0 && (
                   <div style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "5px", padding: "12px" }}>
-                    <div style={{ fontSize: "13px", color: "#E8C96A", fontWeight: 600, marginBottom: "8px" }}>Live Leaderboard</div>
-                    <div>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
-                        <thead>
-                          <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                            <th style={{ padding: "6px 4px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Pos</th>
-                            <th style={{ padding: "6px 6px", textAlign: "left", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase", minWidth: "100px" }}>Name</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R1</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R2</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R3</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>R4</th>
-                            <th style={{ padding: "6px 4px", textAlign: "center", color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase" }}>Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {leaderboard.rows.map((player, i) => {
-                            const flag = getCountryFlag(player.country);
-                            const isLeader = i === 0;
-                            const round = (n: number) => player.rounds?.[n] || "-";
-                            return (
-                              <tr key={player.playerId || i} style={{ borderBottom: i < leaderboard.rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                                <td style={{ padding: "8px 4px", color: isLeader ? "#E8C96A" : "rgba(255,255,255,0.5)", fontWeight: isLeader ? 600 : 400, fontSize: "11px" }}>
-                                  {player.position}
-                                </td>
-                                <td style={{ padding: "8px 6px" }}>
-                                  <div className="flex items-center" style={{ gap: "4px" }}>
-                                    <span style={{ color: isLeader ? "#E8C96A" : "#FFFFFF", fontWeight: isLeader ? 600 : 400, fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                      {player.name}
-                                    </span>
-                                    {flag && <span style={{ fontSize: "10px", flexShrink: 0 }}>{flag}</span>}
+                    <div style={{ fontSize: "13px", color: "#E8C96A", fontWeight: 600, marginBottom: "10px" }}>Live Leaderboard</div>
+                    {/* Collapsible stacked cards — header row (pos / name / total) is
+                        always visible; tap to expand and reveal R1–R4 tiles below. */}
+                    <div className="flex flex-col" style={{ gap: "6px" }}>
+                      {leaderboard.rows.map((player, i) => {
+                        const flag = getCountryFlag(player.country);
+                        const isLeader = i === 0;
+                        const round = (n: number) => player.rounds?.[n] || "-";
+                        const rowKey = `${event.tournId}:${player.playerId || i}`;
+                        const isExpanded = expandedLbRows.has(rowKey);
+                        return (
+                          <div
+                            key={player.playerId || i}
+                            style={{
+                              backgroundColor: isLeader ? "rgba(232,201,106,0.06)" : "rgba(255,255,255,0.02)",
+                              borderRadius: "6px",
+                              border: isLeader ? "1px solid rgba(232,201,106,0.25)" : "1px solid rgba(255,255,255,0.04)",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleLbRow(rowKey)}
+                              aria-expanded={isExpanded}
+                              className="flex items-center"
+                              style={{
+                                gap: "8px",
+                                width: "100%",
+                                padding: "8px 10px",
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                                textAlign: "left",
+                              }}
+                            >
+                              <span style={{ color: isLeader ? "#E8C96A" : "rgba(255,255,255,0.5)", fontWeight: isLeader ? 700 : 500, fontSize: "11px", minWidth: "22px" }}>
+                                {player.position}
+                              </span>
+                              <div className="flex items-center" style={{ gap: "4px", flex: 1, minWidth: 0 }}>
+                                <span style={{ color: isLeader ? "#E8C96A" : "#FFFFFF", fontWeight: isLeader ? 600 : 500, fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {player.name}
+                                </span>
+                                {flag && <span style={{ fontSize: "10px", flexShrink: 0 }}>{flag}</span>}
+                              </div>
+                              <span style={{ color: getScoreColor(player), fontWeight: 700, fontSize: "13px", flexShrink: 0 }}>
+                                {player.score}
+                              </span>
+                              <span
+                                style={{
+                                  color: "rgba(255,255,255,0.4)",
+                                  fontSize: "11px",
+                                  flexShrink: 0,
+                                  transition: "transform 0.15s ease",
+                                  transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                  lineHeight: 1,
+                                }}
+                                aria-hidden="true"
+                              >
+                                ▾
+                              </span>
+                            </button>
+                            {isExpanded && (
+                              <div className="grid grid-cols-4" style={{ gap: "6px", padding: "0 10px 10px" }}>
+                                {[0, 1, 2, 3].map((n) => (
+                                  <div
+                                    key={n}
+                                    style={{
+                                      backgroundColor: "rgba(255,255,255,0.03)",
+                                      borderRadius: "4px",
+                                      padding: "6px",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "9px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                      R{n + 1}
+                                    </div>
+                                    <div style={{ color: "rgba(255,255,255,0.85)", fontSize: "12px", fontWeight: 600, marginTop: "2px" }}>
+                                      {round(n)}
+                                    </div>
                                   </div>
-                                </td>
-                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(0)}</td>
-                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(1)}</td>
-                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(2)}</td>
-                                <td style={{ padding: "8px 4px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "10px" }}>{round(3)}</td>
-                                <td style={{ padding: "8px 4px", textAlign: "center", color: getScoreColor(player), fontWeight: 600, fontSize: "11px" }}>
-                                  {player.score}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
+                    {leaderboard.courseName && (
+                      <div style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", textAlign: "center", marginTop: "10px" }}>
+                        {leaderboard.courseName}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
