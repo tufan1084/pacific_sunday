@@ -246,9 +246,17 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
               >
                 {activeTeam ? (
                   <>
-                    {activeTeam.privacy === "public"
-                      ? <IoEarthOutline size={11} />
-                      : <IoLockClosedOutline size={11} />}
+                    {activeTeam.imageUrl ? (
+                      <img
+                        src={resolveMediaUrl(activeTeam.imageUrl)}
+                        alt=""
+                        style={{ width: "14px", height: "14px", borderRadius: "3px", objectFit: "cover", flexShrink: 0 }}
+                      />
+                    ) : activeTeam.privacy === "public" ? (
+                      <IoEarthOutline size={11} />
+                    ) : (
+                      <IoLockClosedOutline size={11} />
+                    )}
                     <span>Posting to · {activeTeam.name}</span>
                   </>
                 ) : (
@@ -297,9 +305,17 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
                         fontFamily: "inherit",
                       }}
                     >
-                      {t.privacy === "public"
-                        ? <IoEarthOutline size={11} />
-                        : <IoLockClosedOutline size={11} />}
+                      {t.imageUrl ? (
+                        <img
+                          src={resolveMediaUrl(t.imageUrl)}
+                          alt=""
+                          style={{ width: "18px", height: "18px", borderRadius: "4px", objectFit: "cover", flexShrink: 0 }}
+                        />
+                      ) : t.privacy === "public" ? (
+                        <IoEarthOutline size={11} />
+                      ) : (
+                        <IoLockClosedOutline size={11} />
+                      )}
                       <span>{t.name}</span>
                     </button>
                   ))}

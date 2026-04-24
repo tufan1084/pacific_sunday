@@ -125,11 +125,15 @@ export default function NotificationsDropdown() {
   }, [currentUserId]);
 
   useEffect(() => {
-    const handle = (e: MouseEvent) => {
+    const handle = (e: Event) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
+    document.addEventListener("touchstart", handle);
+    return () => {
+      document.removeEventListener("mousedown", handle);
+      document.removeEventListener("touchstart", handle);
+    };
   }, []);
 
   const handleOpen = async () => {
@@ -190,13 +194,20 @@ export default function NotificationsDropdown() {
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       <button
+        type="button"
         onClick={handleOpen}
-        style={{ color: "#E8C96A", background: "none", border: "none", cursor: "pointer", display: "flex", position: "relative" }}
+        style={{
+          color: "#E8C96A", background: "none", border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative", padding: "6px", borderRadius: "6px",
+          WebkitTapHighlightColor: "transparent",
+        }}
         aria-label="Notifications"
+        aria-expanded={open}
       >
         <NotificationIcon size={24} />
         {badgeCount > 0 && (
-          <span style={{ position: "absolute", top: "-4px", right: "-4px", backgroundColor: "#F87171", color: "#FFF", fontSize: "10px", fontWeight: 700, borderRadius: "10px", padding: "2px 5px", minWidth: "16px", textAlign: "center" }}>
+          <span style={{ position: "absolute", top: "0px", right: "0px", backgroundColor: "#F87171", color: "#FFF", fontSize: "10px", fontWeight: 700, borderRadius: "10px", padding: "2px 5px", minWidth: "16px", textAlign: "center", pointerEvents: "none" }}>
             {badgeCount > 99 ? "99+" : badgeCount}
           </span>
         )}
@@ -204,11 +215,19 @@ export default function NotificationsDropdown() {
 
       {open && (
         <div style={{
-          position: "absolute", top: "calc(100% + 8px)", right: 0,
+          // Fixed to viewport so the panel anchors to the screen's right edge
+          // rather than the bell button's right edge. The bell sits left of the
+          // edit + profile icons, so `position: absolute; right: 0` pushed the
+          // dropdown off-screen on mobile. Header height is clamp(60, 8vw, 90).
+          position: "fixed",
+          top: "calc(clamp(60px, 8vw, 90px) + 8px)",
+          right: "12px",
+          width: "min(420px, calc(100vw - 24px))",
+          maxHeight: "calc(100vh - clamp(60px, 8vw, 90px) - 24px)",
+          overflowY: "auto",
           backgroundColor: "#13192A", border: "1px solid #1E2A47",
-          borderRadius: "8px", minWidth: "360px", maxWidth: "420px",
+          borderRadius: "8px",
           zIndex: 50, boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-          maxHeight: "520px", overflowY: "auto",
           fontFamily: "var(--font-poppins), sans-serif",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid #1E2A47", position: "sticky", top: 0, backgroundColor: "#13192A" }}>
