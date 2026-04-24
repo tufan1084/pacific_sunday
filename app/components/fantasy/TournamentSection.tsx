@@ -49,6 +49,25 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Los_Angeles" });
 }
 
+// Pacific Time label: flips between "PDT (GMT-7)" in summer and "PST (GMT-8)"
+// in winter so the viewer always sees the real abbreviation + offset for today.
+function getPacificTzLabel() {
+  const now = new Date();
+  const abbr =
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", timeZoneName: "short" })
+      .formatToParts(now)
+      .find((p) => p.type === "timeZoneName")?.value || "PT";
+  const pacificHour = parseInt(
+    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour: "2-digit", hour12: false }),
+    10,
+  );
+  const utcHour = now.getUTCHours();
+  let offset = pacificHour - utcHour;
+  if (offset > 12) offset -= 24;
+  if (offset < -12) offset += 24;
+  return `${abbr} (GMT${offset >= 0 ? "+" : ""}${offset})`;
+}
+
 function getCountryFlag(country: string) {
   if (!country || country.length !== 2) return null;
   const code = country.toUpperCase();
@@ -208,48 +227,70 @@ export default function TournamentSection({
         fontFamily: "var(--font-poppins), sans-serif",
       }}
     >
-      {/* Tabs */}
-      <div className="flex" style={{ gap: "4px", marginBottom: "16px" }}>
-        {TABS.map((tab) => {
-          const count = lists[tab].length;
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "5px",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: 500,
-                fontFamily: "var(--font-poppins), sans-serif",
-                backgroundColor: isActive ? "#E8C96A" : "rgba(255,255,255,0.06)",
-                color: isActive ? "#060D1F" : "rgba(255,255,255,0.5)",
-                transition: "all 0.2s ease",
-              }}
-            >
-              {TAB_LABELS[tab]}
-              {tab === "live" && count > 0 && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "50%",
-                    backgroundColor: isActive ? "#060D1F" : "#4ADE80",
-                    marginLeft: "6px",
-                    verticalAlign: "middle",
-                  }}
-                />
-              )}
-              {count > 0 && (
-                <span style={{ marginLeft: "6px", opacity: 0.7 }}>({count})</span>
-              )}
-            </button>
-          );
-        })}
+      {/* Tabs + timezone hint (all dates rendered in Pacific Time — label flips PDT/PST with DST) */}
+      <div
+        className="flex"
+        style={{
+          gap: "4px",
+          marginBottom: "16px",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          rowGap: "8px",
+        }}
+      >
+        <div className="flex" style={{ gap: "4px", flexWrap: "wrap" }}>
+          {TABS.map((tab) => {
+            const count = lists[tab].length;
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "5px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  fontFamily: "var(--font-poppins), sans-serif",
+                  backgroundColor: isActive ? "#E8C96A" : "rgba(255,255,255,0.06)",
+                  color: isActive ? "#060D1F" : "rgba(255,255,255,0.5)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {TAB_LABELS[tab]}
+                {tab === "live" && count > 0 && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      backgroundColor: isActive ? "#060D1F" : "#4ADE80",
+                      marginLeft: "6px",
+                      verticalAlign: "middle",
+                    }}
+                  />
+                )}
+                {count > 0 && (
+                  <span style={{ marginLeft: "6px", opacity: 0.7 }}>({count})</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div
+          style={{
+            fontSize: "11px",
+            color: "rgba(255,255,255,0.4)",
+            fontFamily: "var(--font-poppins), sans-serif",
+            whiteSpace: "nowrap",
+          }}
+        >
+          All times in {getPacificTzLabel()}
+        </div>
       </div>
 
       {/* Loading */}

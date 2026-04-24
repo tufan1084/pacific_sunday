@@ -12,9 +12,10 @@ import type { FantasyStatCard } from "@/app/types/fantasy";
 const EMPTY: TournamentList = { completed: [], live: [], upcoming: [] };
 
 // Module-level caches persist across client navigations so the page fetches
-// once per session (5-min TTL). `null` balance = never fetched; 0 is a real value.
+// once per session (5-min TTL). `null` = never fetched; 0 / real rank are real values.
 let tournamentsCache: { data: TournamentList; timestamp: number } | null = null;
 let walletCache: { balance: number; timestamp: number } | null = null;
+let rankCache: { rank: number | null; total: number; timestamp: number } | null = null;
 const CACHE_DURATION = 5 * 60 * 1000;
 
 export default function FantasyGolfPage() {
@@ -22,18 +23,21 @@ export default function FantasyGolfPage() {
   const [tournaments, setTournaments] = useState<TournamentList>(tournamentsCache?.data || EMPTY);
   const [tournLoading, setTournLoading] = useState(!tournamentsCache);
   const [walletBalance, setWalletBalance] = useState<number | null>(walletCache?.balance ?? null);
+  const [rank, setRank] = useState<number | null>(rankCache?.rank ?? null);
 
   useEffect(() => {
     let cancelled = false;
     const now = Date.now();
     const tournFresh = tournamentsCache && (now - tournamentsCache.timestamp) < CACHE_DURATION;
     const walletFresh = walletCache && (now - walletCache.timestamp) < CACHE_DURATION;
+    const rankFresh = rankCache && (now - rankCache.timestamp) < CACHE_DURATION;
 
     if (tournFresh) {
       setTournaments(tournamentsCache!.data);
       setTournLoading(false);
     }
     if (walletFresh) setWalletBalance(walletCache!.balance);
+    if (rankFresh) setRank(rankCache!.rank);
 
     const tasks: Promise<void>[] = [];
 
@@ -69,18 +73,34 @@ export default function FantasyGolfPage() {
       })());
     }
 
+    if (!rankFresh) {
+      tasks.push((async () => {
+        try {
+          const res = await api.points.getRank();
+          if (!cancelled && res.success && res.data) {
+            const r = res.data.rank;
+            setRank(r);
+            rankCache = { rank: r, total: res.data.total, timestamp: Date.now() };
+          }
+        } catch {
+          // unauthenticated or server error — card falls back to "—"
+        }
+      })());
+    }
+
     void Promise.all(tasks);
     return () => { cancelled = true; };
   }, []);
 
   const stats = useMemo<FantasyStatCard[]>(() => {
     const pointsValue = walletBalance === null ? "—" : walletBalance.toLocaleString("en-US");
+    const rankValue = rank === null ? "—" : `#${rank}`;
     return [
       { value: pointsValue, label: "Your Points" },
-      FANTASY_STATS[1],
+      { value: rankValue, label: "Club Rank" },
       FANTASY_STATS[2],
     ];
-  }, [walletBalance]);
+  }, [walletBalance, rank]);
 
   // Signal "field ready" — first upcoming/live tournament with fieldAvailable=true
   const availableTournId =

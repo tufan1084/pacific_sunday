@@ -334,6 +334,8 @@ export const api = {
       }),
     getWallet: () =>
       fetchApi<{ wallet: ApiPointsWallet }>("/points/wallet"),
+    getRank: () =>
+      fetchApi<{ rank: number | null; total: number; balance: number }>("/points/rank"),
   },
 };
 
