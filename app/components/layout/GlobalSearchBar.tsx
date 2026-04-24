@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { FiSearch, FiUser, FiUsers, FiLock, FiGlobe } from "react-icons/fi";
 import { api, ApiSearchUser, ApiTeam } from "@/app/services/api";
+import { resolveMediaUrl } from "@/app/lib/constants";
 
 type Results = { users: ApiSearchUser[]; teams: ApiTeam[] };
 
@@ -134,7 +135,7 @@ export default function GlobalSearchBar() {
                 >
                   <div style={{ width: "30px", height: "30px", borderRadius: "5px", background: "#060D1F", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {t.imageUrl
-                      ? <Image src={t.imageUrl} alt="" width={30} height={30} style={{ width: "100%", height: "100%", objectFit: "cover" }} unoptimized />
+                      ? <Image src={resolveMediaUrl(t.imageUrl)} alt="" width={30} height={30} style={{ width: "100%", height: "100%", objectFit: "cover" }} unoptimized />
                       : (t.privacy === "private" ? <FiLock size={14} /> : <FiGlobe size={14} />)
                     }
                   </div>
@@ -171,8 +172,19 @@ export default function GlobalSearchBar() {
                     fontFamily: "inherit",
                   }}
                 >
-                  <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, flexShrink: 0 }}>
-                    {u.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                  <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                    {u.photoUrl ? (
+                      <Image
+                        src={resolveMediaUrl(u.photoUrl)}
+                        alt=""
+                        width={30}
+                        height={30}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        unoptimized
+                      />
+                    ) : (
+                      u.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</div>

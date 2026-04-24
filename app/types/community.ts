@@ -1,8 +1,3 @@
-export interface CommunityStats {
-  label: string;
-  value: number;
-}
-
 export interface Team {
   id: number;
   name: string;

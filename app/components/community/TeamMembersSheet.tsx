@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { IoClose, IoEarthOutline, IoLockClosedOutline, IoSearch, IoSettingsOutline, IoPersonAddOutline, IoNotificationsOutline } from "react-icons/io5";
+import { IoClose, IoEarthOutline, IoLockClosedOutline, IoSearch, IoSettingsOutline, IoPersonAddOutline, IoNotificationsOutline, IoImageOutline } from "react-icons/io5";
 import { api, ApiJoinRequest } from "@/app/services/api";
+import { resolveMediaUrl } from "@/app/lib/constants";
 import type { Team, TeamMember } from "@/app/types/community";
 import { useToast } from "@/app/context/ToastContext";
 import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
@@ -31,6 +32,9 @@ export default function TeamMembersSheet({ team, onClose, onJoin, onLeave, refre
   const [teamName, setTeamName] = useState(team.name);
   const [teamDesc, setTeamDesc] = useState(team.description || "");
   const [teamPrivacy, setTeamPrivacy] = useState<"public" | "private">(team.privacy);
+  const [teamImage, setTeamImage] = useState<string | null>(team.imageUrl);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Invite form
   const [searchQuery, setSearchQuery] = useState("");
@@ -148,6 +152,36 @@ export default function TeamMembersSheet({ team, onClose, onJoin, onLeave, refre
     }
   };
 
+  const handlePickImage = () => {
+    if (busy || uploadingImage) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be under 10 MB");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const res = await api.teams.uploadImage(file);
+      if (res.success && res.data?.imageUrl) {
+        setTeamImage(res.data.imageUrl);
+      } else {
+        toast.error(res.message || "Could not upload image");
+      }
+    } catch {
+      toast.error("Could not upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const clearTeamImage = () => setTeamImage(null);
+
   const handleSaveSettings = async () => {
     if (!teamName.trim() || teamName.trim().length < 3) {
       toast.error("Team name must be at least 3 characters");
@@ -159,6 +193,7 @@ export default function TeamMembersSheet({ team, onClose, onJoin, onLeave, refre
         name: teamName.trim(),
         description: teamDesc.trim() || undefined,
         privacy: teamPrivacy,
+        imageUrl: teamImage, // null clears the image, string sets/replaces it
       });
       if (res.success) {
         toast.success("Team updated successfully");
@@ -409,6 +444,56 @@ export default function TeamMembersSheet({ team, onClose, onJoin, onLeave, refre
       {/* Settings View */}
       {view === "settings" && (
         <div>
+          <div style={{ marginBottom: "12px" }}>
+            <label style={{ color: "#FFF", fontSize: "12px", display: "block", marginBottom: "6px" }}>Team image</label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handlePickImage}
+                disabled={busy || uploadingImage}
+                style={{
+                  width: "56px", height: "56px",
+                  borderRadius: "8px",
+                  backgroundColor: "#060D1F",
+                  border: "1px dashed rgba(232,201,106,0.4)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: busy || uploadingImage ? "not-allowed" : "pointer",
+                  overflow: "hidden", padding: 0, flexShrink: 0,
+                }}
+                aria-label="Upload team image"
+              >
+                {teamImage ? (
+                  <Image src={resolveMediaUrl(teamImage)} alt="Team" width={56} height={56} style={{ width: "56px", height: "56px", objectFit: "cover" }} unoptimized />
+                ) : uploadingImage ? (
+                  <span style={{ fontSize: "10px", color: "#888" }}>Uploading…</span>
+                ) : (
+                  <IoImageOutline size={20} color="#E8C96A" />
+                )}
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#94A3B8", fontSize: "11px", lineHeight: 1.5 }}>
+                  {teamImage ? "Click the image to replace it." : "JPG / PNG / WebP, up to 10 MB."}
+                </div>
+                {teamImage && (
+                  <button
+                    type="button"
+                    onClick={clearTeamImage}
+                    disabled={busy || uploadingImage}
+                    style={{ background: "none", border: "none", color: "#F87171", fontSize: "11px", marginTop: "4px", padding: 0, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    Remove image
+                  </button>
+                )}
+              </div>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              onChange={handleImageSelected}
+              style={{ display: "none" }}
+            />
+          </div>
           <div style={{ marginBottom: "12px" }}>
             <label style={{ color: "#FFF", fontSize: "12px", display: "block", marginBottom: "6px" }}>Team Name</label>
             <input value={teamName} onChange={(e) => setTeamName(e.target.value)} style={{ width: "100%", backgroundColor: "#060D1F", border: "1px solid #1E2A47", borderRadius: "5px", padding: "8px", color: "#FFF", fontSize: "12px", boxSizing: "border-box" }} />

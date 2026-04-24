@@ -666,7 +666,7 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
             style={{
               backgroundColor: "#E8C96A", color: "#060D1F",
               border: "none", borderRadius: "999px",
-              width: "36px", height: "36px",
+              width: "28px", height: "28px",
               cursor: submittingComment || (!commentText.trim() && !commentMedia) ? "not-allowed" : "pointer",
               opacity: submittingComment || (!commentText.trim() && !commentMedia) ? 0.5 : 1,
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -674,7 +674,7 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
             }}
             aria-label="Send comment"
           >
-            <IoMdSend size={16} />
+            <IoMdSend size={13} />
           </button>
         </div>
       </div>

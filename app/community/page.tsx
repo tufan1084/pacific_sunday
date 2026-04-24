@@ -15,7 +15,7 @@ import TeamMembersSheet from "@/app/components/community/TeamMembersSheet";
 import AddTeamPanel from "@/app/components/community/AddTeamPanel";
 import MobileTeamSheet from "@/app/components/community/MobileTeamSheet";
 import GlobalSearchBar from "@/app/components/layout/GlobalSearchBar";
-import { COMMUNITY_STATS, type TagOption } from "@/app/lib/community-data";
+import { type TagOption } from "@/app/lib/community-data";
 import { api } from "@/app/services/api";
 import { SOCKET_URL } from "@/app/lib/constants";
 import type { Team } from "@/app/types/community";
@@ -506,7 +506,7 @@ export default function CommunityPage() {
                 refreshToken={membersRefreshToken}
               />
             )}
-            <CommunityStatus stats={COMMUNITY_STATS} />
+            <CommunityStatus />
           </div>
         )}
       </div>
@@ -554,7 +554,7 @@ export default function CommunityPage() {
                 refreshToken={membersRefreshToken}
               />
             )}
-            <CommunityStatus stats={COMMUNITY_STATS} />
+            <CommunityStatus />
           </MobileTeamSheet>
         </>
       )}

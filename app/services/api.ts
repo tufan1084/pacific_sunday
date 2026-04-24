@@ -44,7 +44,8 @@ export const api = {
   health: () => fetchApi("/health"),
 
   stats: {
-    community: () => fetchApi<{ totalUsers: number }>("/stats/community"),
+    community: () =>
+      fetchApi<{ totalUsers: number; postsThisWeek: number; activeOwners: number; nfcScansToday: number }>("/stats/community"),
   },
 
   bag: {
@@ -444,6 +445,7 @@ export interface ApiSearchUser {
   id: number;
   username: string;
   name: string;
+  photoUrl: string | null;
 }
 
 export interface ApiUserProfile {
