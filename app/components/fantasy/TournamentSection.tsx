@@ -49,25 +49,6 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Los_Angeles" });
 }
 
-// Pacific Time label: flips between "PDT (GMT-7)" in summer and "PST (GMT-8)"
-// in winter so the viewer always sees the real abbreviation + offset for today.
-function getPacificTzLabel() {
-  const now = new Date();
-  const abbr =
-    new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", timeZoneName: "short" })
-      .formatToParts(now)
-      .find((p) => p.type === "timeZoneName")?.value || "PT";
-  const pacificHour = parseInt(
-    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour: "2-digit", hour12: false }),
-    10,
-  );
-  const utcHour = now.getUTCHours();
-  let offset = pacificHour - utcHour;
-  if (offset > 12) offset -= 24;
-  if (offset < -12) offset += 24;
-  return `${abbr} (GMT${offset >= 0 ? "+" : ""}${offset})`;
-}
-
 function getCountryFlag(country: string) {
   if (!country || country.length !== 2) return null;
   const code = country.toUpperCase();
@@ -291,16 +272,6 @@ export default function TournamentSection({
               </button>
             );
           })}
-        </div>
-        <div
-          style={{
-            fontSize: "11px",
-            color: "rgba(255,255,255,0.4)",
-            fontFamily: "var(--font-poppins), sans-serif",
-            whiteSpace: "nowrap",
-          }}
-        >
-          All times in {getPacificTzLabel()}
         </div>
       </div>
 
