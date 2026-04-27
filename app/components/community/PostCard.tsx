@@ -6,13 +6,14 @@ import { api } from "@/app/services/api";
 import { SOCKET_URL, resolveMediaUrl } from "@/app/lib/constants";
 import { io, Socket } from "socket.io-client";
 import { IoIosAttach, IoMdSend } from "react-icons/io";
-import { FiShare2 } from "react-icons/fi";
+import { FiShare2, FiTrash2, FiEdit2, FiMoreHorizontal } from "react-icons/fi";
 import { BsPinAngleFill } from "react-icons/bs";
 import { useToast } from "@/app/context/ToastContext";
 import PostActionMenu from "./PostActionMenu";
 import ShareSheet from "./ShareSheet";
 import ReportPanel from "./ReportPanel";
 import ConfirmDialog from "../ui/ConfirmDialog";
+import SaveToCategorySheet from "./SaveToCategorySheet";
 
 interface PostCardProps {
   post: any;
@@ -48,7 +49,9 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
   const [menuOpen, setMenuOpen] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState<boolean>(Boolean(post.isSavedByMe));
+  const [savedCategoryId, setSavedCategoryId] = useState<number | null>(post.myCategoryId ?? null);
+  const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
 
@@ -89,6 +92,29 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
       });
     });
 
+    socket.on("comment:deleted", ({ postId, commentId }: { postId: number; commentId: number }) => {
+      if (postId !== post.id) return;
+      setComments(prev =>
+        prev
+          .filter(c => c.id !== commentId)
+          .map(c => ({
+            ...c,
+            replies: Array.isArray(c.replies) ? c.replies.filter((r: any) => r.id !== commentId) : c.replies,
+          }))
+      );
+    });
+
+    socket.on("comment:edited", ({ postId, comment }: { postId: number; comment: any }) => {
+      if (postId !== post.id || !comment) return;
+      setComments(prev => prev.map(c => {
+        if (c.id === comment.id) return { ...c, content: comment.content, updatedAt: comment.updatedAt };
+        if (Array.isArray(c.replies)) {
+          return { ...c, replies: c.replies.map((r: any) => r.id === comment.id ? { ...r, content: comment.content, updatedAt: comment.updatedAt } : r) };
+        }
+        return c;
+      }));
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
@@ -118,7 +144,13 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
     if ((!commentText.trim() && !commentMedia) || submittingComment) return;
     setSubmittingComment(true);
     try {
-      await api.posts.addComment(post.id, commentText || " ");
+      const res = await api.posts.addComment(post.id, commentText || " ");
+      if ((res as any)?.success === false) {
+        // The fetchApi wrapper now returns 403 errors as { success:false, message, code }
+        // instead of auto-logging the user out. Surface the moderation message.
+        showToast(res.message || "Failed to add comment", "error");
+        return;
+      }
       setCommentText("");
       setCommentMedia(null);
       setCommentMediaPreview(null);
@@ -126,6 +158,7 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
       onUpdate();
     } catch (error) {
       console.error("Failed to add comment:", error);
+      showToast("Failed to add comment", "error");
     } finally {
       setSubmittingComment(false);
     }
@@ -163,6 +196,92 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
       console.error("Failed to add reply:", error);
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  // 3-dot menu state for owner-only edit/delete on each comment + reply.
+  // We track the *open* menu by comment id so opening one closes any other.
+  const [openCommentMenuId, setOpenCommentMenuId] = useState<number | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  // Pending delete target for the styled ConfirmDialog (replaces window.confirm).
+  const [pendingDeleteComment, setPendingDeleteComment] = useState<
+    { id: number; isReply: boolean; parentId?: number } | null
+  >(null);
+
+  const startEdit = (id: number, content: string) => {
+    setOpenCommentMenuId(null);
+    setEditingCommentId(id);
+    setEditText(content);
+  };
+  const cancelEdit = () => {
+    setEditingCommentId(null);
+    setEditText("");
+  };
+
+  const handleSaveEdit = async (commentId: number) => {
+    const text = editText.trim();
+    if (!text || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const res = await api.posts.editComment(commentId, text);
+      if (res.success && (res.data as any)?.comment) {
+        const updated = (res.data as any).comment;
+        // Apply locally; the socket emit will sync any other open clients.
+        setComments(prev => prev.map(c =>
+          c.id === commentId
+            ? { ...c, content: updated.content, updatedAt: updated.updatedAt }
+            : ({
+                ...c,
+                replies: Array.isArray(c.replies)
+                  ? c.replies.map((r: any) => r.id === commentId ? { ...r, content: updated.content, updatedAt: updated.updatedAt } : r)
+                  : c.replies,
+              })
+        ));
+        cancelEdit();
+      } else {
+        showToast(res.message || "Failed to edit comment", "error");
+      }
+    } catch {
+      showToast("Failed to edit comment", "error");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Open the styled confirmation dialog (replaces the native window.confirm
+  // alert). Actual delete runs in confirmDeleteComment after the user clicks
+  // the dialog's confirm button.
+  const requestDeleteComment = (commentId: number, isReply: boolean = false, parentId?: number) => {
+    setOpenCommentMenuId(null);
+    setPendingDeleteComment({ id: commentId, isReply, parentId });
+  };
+
+  const confirmDeleteComment = async () => {
+    const target = pendingDeleteComment;
+    if (!target) return;
+    setPendingDeleteComment(null);
+    const snapshot = comments;
+    if (target.isReply && target.parentId !== undefined) {
+      setComments(prev => prev.map(c => c.id === target.parentId
+        ? { ...c, replies: (c.replies || []).filter((r: any) => r.id !== target.id) }
+        : c));
+    } else {
+      setComments(prev => prev.filter(c => c.id !== target.id));
+    }
+    try {
+      const res = await api.posts.deleteComment(target.id);
+      if (!res.success) {
+        showToast(res.message || "Failed to delete comment", "error");
+        setComments(snapshot);
+      } else {
+        // Server emits comment:deleted via socket; onUpdate() refreshes count.
+        onUpdate();
+      }
+    } catch {
+      showToast("Failed to delete comment", "error");
+      setComments(snapshot);
     }
   };
 
@@ -235,6 +354,25 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
     setShowBlockConfirm(true);
   };
 
+  // Per-user hide. Optimistic — drops the card from the local feed immediately
+  // via the parent's onHidePost callback, then persists via the API so the
+  // hide survives across sessions and devices. Failure rolls back nothing on
+  // the UI but logs a toast so the user knows the persist failed.
+  const handleHide = async () => {
+    setMenuOpen(false);
+    onHidePost?.(post.id);
+    try {
+      const res = await api.posts.hide(post.id);
+      if (!res.success) {
+        showToast(res.message || "Could not hide post", "error");
+      } else {
+        showToast("Post hidden from your feed", "success");
+      }
+    } catch {
+      showToast("Could not hide post", "error");
+    }
+  };
+
   const confirmBlock = () => {
     setShowBlockConfirm(false);
     onHideUser?.(postUserId);
@@ -243,8 +381,29 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
 
   const handleSave = () => {
     setMenuOpen(false);
-    setIsSaved(!isSaved);
-    showToast(!isSaved ? "Post saved" : "Post unsaved", "success");
+    if (isSaved) {
+      // Optimistic unsave
+      const prevSaved = isSaved;
+      const prevCat = savedCategoryId;
+      setIsSaved(false);
+      setSavedCategoryId(null);
+      api.posts.unsave(post.id)
+        .then((res) => {
+          if (res.success) showToast("Post unsaved", "success");
+          else { setIsSaved(prevSaved); setSavedCategoryId(prevCat); showToast(res.message || "Failed to unsave", "error"); }
+        })
+        .catch(() => { setIsSaved(prevSaved); setSavedCategoryId(prevCat); showToast("Failed to unsave", "error"); });
+    } else {
+      // Open the category picker; saving happens inside the sheet
+      setShowSaveSheet(true);
+    }
+  };
+
+  const handleSavedToCategory = (categoryId: number | null) => {
+    setIsSaved(true);
+    setSavedCategoryId(categoryId);
+    setShowSaveSheet(false);
+    showToast(categoryId ? "Post saved to category" : "Post saved", "success");
   };
 
   const handleCopyLink = async () => {
@@ -376,6 +535,7 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
           onReport={handleReport}
           onBlock={handleBlock}
           onSave={handleSave}
+          onHide={handleHide}
           onCopyLink={handleCopyLink}
         />
       </div>
@@ -404,7 +564,10 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
         </div>
       )}
 
-      {/* Full-bleed media */}
+      {/* Full-bleed media. Images render in a fixed 1:1 box with object-fit:cover
+          (Instagram-style) so a feed of mixed portrait/landscape uploads stays
+          visually consistent. Videos keep their native aspect because cropping
+          a video looks bad. */}
       {mediaUrls.length > 0 && (
         <div
           style={{
@@ -418,13 +581,52 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
           {mediaUrls.map((url: string, idx: number) => {
             const isVideo = /\.(mp4|mov|avi|mkv|webm)(\?|$)/i.test(url) || url.includes("/video/");
             const fullUrl = resolveMediaUrl(url);
+            if (isVideo) {
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    position: "relative",
+                    overflow: "hidden",
+                    backgroundColor: "#000",
+                    aspectRatio: "16 / 9",
+                  }}
+                >
+                  <video
+                    src={fullUrl}
+                    controls
+                    style={{ width: "100%", height: "100%", display: "block", objectFit: "contain", backgroundColor: "#000" }}
+                  />
+                </div>
+              );
+            }
             return (
-              <div key={idx} style={{ position: "relative", overflow: "hidden", backgroundColor: "#000" }}>
-                {isVideo ? (
-                  <video src={fullUrl} controls style={{ width: "100%", height: "auto", display: "block", maxHeight: "520px" }} />
-                ) : (
-                  <img src={fullUrl} alt="Post media" style={{ width: "100%", height: "auto", display: "block", maxHeight: "520px", objectFit: "cover" }} />
-                )}
+              <div
+                key={idx}
+                style={{
+                  position: "relative",
+                  overflow: "hidden",
+                  backgroundColor: "#000",
+                  // 4:3 keeps every card visually consistent without going as tall
+                  // as a 1:1 square. maxHeight caps the image on very wide
+                  // viewports so it never dominates the screen.
+                  aspectRatio: mediaUrls.length === 1 ? "4 / 3" : "1 / 1",
+                  maxHeight: mediaUrls.length === 1 ? "440px" : "320px",
+                  width: "100%",
+                }}
+              >
+                <img
+                  src={fullUrl}
+                  alt="Post media"
+                  loading="lazy"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "block",
+                    objectFit: "cover",
+                    objectPosition: "center",
+                  }}
+                />
               </div>
             );
           })}
@@ -563,24 +765,102 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ marginBottom: "2px" }}>
-                    <span style={{ color: "#E8C96A", fontSize: "12px", fontWeight: 600, marginRight: "6px" }}>
-                      {comment.user?.profile?.name || comment.user?.username || "Unknown"}
-                    </span>
-                    <span style={{ color: "#888888", fontSize: "11px" }}>
-                      {getTimeAgo(comment.createdAt)}
-                    </span>
+                  <div className="flex items-start" style={{ gap: "8px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ marginBottom: "2px" }}>
+                        <span style={{ color: "#E8C96A", fontSize: "12px", fontWeight: 600, marginRight: "6px" }}>
+                          {comment.user?.profile?.name || comment.user?.username || "Unknown"}
+                        </span>
+                        <span style={{ color: "#888888", fontSize: "11px" }}>
+                          {getTimeAgo(comment.createdAt)}
+                          {comment.updatedAt && comment.updatedAt !== comment.createdAt && <span style={{ marginLeft: "4px", fontStyle: "italic" }}>· edited</span>}
+                        </span>
+                      </div>
+                      {editingCommentId === comment.id ? (
+                        <div className="flex items-start" style={{ gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
+                          <textarea
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            autoFocus
+                            rows={2}
+                            onKeyDown={(e) => { if (e.key === "Escape") cancelEdit(); }}
+                            style={{ flex: "1 1 160px", minWidth: 0, backgroundColor: "#060D1F", border: "1px solid #1E2A47", borderRadius: "4px", padding: "5px 7px", color: "#FFFFFF", fontSize: "12px", fontFamily: "inherit", outline: "none", resize: "vertical", minHeight: "44px", maxHeight: "180px", lineHeight: "1.4" }}
+                          />
+                          <button onClick={() => handleSaveEdit(comment.id)} disabled={savingEdit || !editText.trim()} style={{ backgroundColor: "#E8C96A", color: "#060D1F", border: "none", borderRadius: "4px", padding: "4px 9px", fontSize: "10px", fontWeight: 600, cursor: savingEdit || !editText.trim() ? "not-allowed" : "pointer", opacity: savingEdit || !editText.trim() ? 0.5 : 1, flexShrink: 0 }}>
+                            Save
+                          </button>
+                          <button onClick={cancelEdit} style={{ background: "transparent", color: "#888", border: "1px solid #1E2A47", borderRadius: "4px", padding: "4px 9px", fontSize: "10px", cursor: "pointer", flexShrink: 0 }}>
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <p style={{ color: "#FFFFFF", fontSize: "12px", lineHeight: "1.4", marginBottom: "4px", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                          {comment.content}
+                        </p>
+                      )}
+                      <div className="flex items-center" style={{ gap: "10px" }}>
+                        <button onClick={() => setReplyingTo(comment.id)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#E8C96A", fontSize: "11px" }}>
+                          Reply
+                        </button>
+                      </div>
+                    </div>
+                    {/* Kebab menu — owner or post owner */}
+                    {(comment.user?.id === currentUserId || isOwner) && editingCommentId !== comment.id && (
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <button
+                          onClick={() => setOpenCommentMenuId(openCommentMenuId === comment.id ? null : comment.id)}
+                          aria-label="Comment actions"
+                          style={{ background: "none", border: "none", padding: "2px 4px", cursor: "pointer", color: "rgba(255,255,255,0.5)", borderRadius: "4px" }}
+                        >
+                          <FiMoreHorizontal size={14} />
+                        </button>
+                        {openCommentMenuId === comment.id && (
+                          <div
+                            onMouseLeave={() => setOpenCommentMenuId(null)}
+                            style={{
+                              position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 20,
+                              backgroundColor: "#060D1F", border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: "5px", minWidth: "120px",
+                              boxShadow: "0 6px 20px rgba(0,0,0,0.5)", overflow: "hidden",
+                            }}
+                          >
+                            {comment.user?.id === currentUserId && (
+                              <button
+                                onClick={() => startEdit(comment.id, comment.content)}
+                                className="flex items-center"
+                                style={{ gap: "8px", width: "100%", padding: "8px 12px", background: "none", border: "none", color: "#FFF", fontSize: "12px", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                              >
+                                <FiEdit2 size={12} color="#E8C96A" /><span>Edit</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => requestDeleteComment(comment.id)}
+                              className="flex items-center"
+                              style={{ gap: "8px", width: "100%", padding: "8px 12px", background: "none", border: "none", color: "#F87171", fontSize: "12px", cursor: "pointer", fontFamily: "inherit", textAlign: "left", borderTop: comment.user?.id === currentUserId ? "1px solid rgba(255,255,255,0.06)" : "none" }}
+                            >
+                              <FiTrash2 size={12} /><span>Delete</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p style={{ color: "#FFFFFF", fontSize: "12px", lineHeight: "1.4", marginBottom: "4px", wordBreak: "break-word" }}>
-                    {comment.content}
-                  </p>
-                  <button onClick={() => setReplyingTo(comment.id)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#E8C96A", fontSize: "11px" }}>
-                    Reply
-                  </button>
 
                   {replyingTo === comment.id && (
                     <div style={{ marginTop: "6px", display: "flex", gap: "6px" }}>
-                      <input value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="Write a reply..." style={{ flex: 1, backgroundColor: "#060D1F", border: "1px solid #1E2A47", borderRadius: "4px", padding: "6px 8px", color: "#FFFFFF", fontSize: "12px" }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddReply(comment.id); } }} />
+                      <textarea
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Write a reply..."
+                        rows={1}
+                        style={{
+                          flex: 1, backgroundColor: "#060D1F", border: "1px solid #1E2A47",
+                          borderRadius: "4px", padding: "6px 8px",
+                          color: "#FFFFFF", fontSize: "12px", fontFamily: "inherit", outline: "none",
+                          resize: "vertical", minHeight: "32px", maxHeight: "140px",
+                          lineHeight: "1.4",
+                        }}
+                      />
                       <button onClick={() => handleAddReply(comment.id)} disabled={submittingComment || !replyText.trim()} style={{ backgroundColor: "#E8C96A", color: "#060D1F", border: "none", borderRadius: "4px", padding: "6px 12px", fontSize: "11px", fontWeight: 600, cursor: "pointer", opacity: submittingComment || !replyText.trim() ? 0.5 : 1 }}>
                         Reply
                       </button>
@@ -602,18 +882,79 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
                                 (reply.user?.profile?.name || reply.user?.username || "U").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
                               )}
                             </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ marginBottom: "2px" }}>
-                                <span style={{ color: "#E8C96A", fontSize: "11px", fontWeight: 600, marginRight: "6px" }}>
-                                  {reply.user?.profile?.name || reply.user?.username || "Unknown"}
-                                </span>
-                                <span style={{ color: "#888888", fontSize: "10px" }}>
-                                  {getTimeAgo(reply.createdAt)}
-                                </span>
+                            <div className="flex items-start" style={{ flex: 1, minWidth: 0, gap: "6px" }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ marginBottom: "2px" }}>
+                                  <span style={{ color: "#E8C96A", fontSize: "11px", fontWeight: 600, marginRight: "6px" }}>
+                                    {reply.user?.profile?.name || reply.user?.username || "Unknown"}
+                                  </span>
+                                  <span style={{ color: "#888888", fontSize: "10px" }}>
+                                    {getTimeAgo(reply.createdAt)}
+                                    {reply.updatedAt && reply.updatedAt !== reply.createdAt && <span style={{ marginLeft: "4px", fontStyle: "italic" }}>· edited</span>}
+                                  </span>
+                                </div>
+                                {editingCommentId === reply.id ? (
+                                  <div className="flex items-start" style={{ gap: "4px", flexWrap: "wrap" }}>
+                                    <textarea
+                                      value={editText}
+                                      onChange={(e) => setEditText(e.target.value)}
+                                      autoFocus
+                                      rows={2}
+                                      onKeyDown={(e) => { if (e.key === "Escape") cancelEdit(); }}
+                                      style={{ flex: "1 1 140px", minWidth: 0, backgroundColor: "#060D1F", border: "1px solid #1E2A47", borderRadius: "4px", padding: "4px 6px", color: "#FFFFFF", fontSize: "11px", fontFamily: "inherit", outline: "none", resize: "vertical", minHeight: "40px", maxHeight: "160px", lineHeight: "1.4" }}
+                                    />
+                                    <button onClick={() => handleSaveEdit(reply.id)} disabled={savingEdit || !editText.trim()} style={{ backgroundColor: "#E8C96A", color: "#060D1F", border: "none", borderRadius: "4px", padding: "3px 8px", fontSize: "10px", fontWeight: 600, cursor: savingEdit || !editText.trim() ? "not-allowed" : "pointer", opacity: savingEdit || !editText.trim() ? 0.5 : 1, flexShrink: 0 }}>
+                                      Save
+                                    </button>
+                                    <button onClick={cancelEdit} style={{ background: "transparent", color: "#888", border: "1px solid #1E2A47", borderRadius: "4px", padding: "3px 8px", fontSize: "10px", cursor: "pointer", flexShrink: 0 }}>
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <p style={{ color: "#FFFFFF", fontSize: "11px", lineHeight: "1.4", wordBreak: "break-word", marginBottom: "2px", whiteSpace: "pre-wrap" }}>
+                                    {reply.content}
+                                  </p>
+                                )}
                               </div>
-                              <p style={{ color: "#FFFFFF", fontSize: "11px", lineHeight: "1.4", wordBreak: "break-word" }}>
-                                {reply.content}
-                              </p>
+                              {(reply.user?.id === currentUserId || isOwner) && editingCommentId !== reply.id && (
+                                <div style={{ position: "relative", flexShrink: 0 }}>
+                                  <button
+                                    onClick={() => setOpenCommentMenuId(openCommentMenuId === reply.id ? null : reply.id)}
+                                    aria-label="Reply actions"
+                                    style={{ background: "none", border: "none", padding: "2px 3px", cursor: "pointer", color: "rgba(255,255,255,0.45)", borderRadius: "4px" }}
+                                  >
+                                    <FiMoreHorizontal size={12} />
+                                  </button>
+                                  {openCommentMenuId === reply.id && (
+                                    <div
+                                      onMouseLeave={() => setOpenCommentMenuId(null)}
+                                      style={{
+                                        position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 20,
+                                        backgroundColor: "#060D1F", border: "1px solid rgba(255,255,255,0.1)",
+                                        borderRadius: "5px", minWidth: "110px",
+                                        boxShadow: "0 6px 20px rgba(0,0,0,0.5)", overflow: "hidden",
+                                      }}
+                                    >
+                                      {reply.user?.id === currentUserId && (
+                                        <button
+                                          onClick={() => startEdit(reply.id, reply.content)}
+                                          className="flex items-center"
+                                          style={{ gap: "8px", width: "100%", padding: "7px 10px", background: "none", border: "none", color: "#FFF", fontSize: "11px", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                                        >
+                                          <FiEdit2 size={11} color="#E8C96A" /><span>Edit</span>
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => requestDeleteComment(reply.id, true, comment.id)}
+                                        className="flex items-center"
+                                        style={{ gap: "8px", width: "100%", padding: "7px 10px", background: "none", border: "none", color: "#F87171", fontSize: "11px", cursor: "pointer", fontFamily: "inherit", textAlign: "left", borderTop: reply.user?.id === currentUserId ? "1px solid rgba(255,255,255,0.06)" : "none" }}
+                                      >
+                                        <FiTrash2 size={11} /><span>Delete</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -642,21 +983,23 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
         )}
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <div style={{ position: "relative", flex: 1 }}>
-            <input
+            <textarea
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               placeholder="Write a comment..."
+              rows={1}
               style={{
                 width: "100%", backgroundColor: "#060D1F",
-                border: "1px solid #1E2A47", borderRadius: "999px",
-                padding: "10px 40px 10px 14px",
+                border: "1px solid #1E2A47", borderRadius: "18px",
+                padding: "8px 40px 8px 14px",
                 color: "#FFFFFF", fontSize: "13px",
                 fontFamily: "inherit", outline: "none",
+                resize: "vertical", minHeight: "38px", maxHeight: "180px",
+                lineHeight: "1.4",
               }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
             />
             <input type="file" accept="image/*,video/*" onChange={handleCommentMediaSelect} style={{ display: "none" }} id={`comment-media-${post.id}`} />
-            <label htmlFor={`comment-media-${post.id}`} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", display: "flex", alignItems: "center", color: "#888888" }}>
+            <label htmlFor={`comment-media-${post.id}`} style={{ position: "absolute", right: "12px", top: "10px", cursor: "pointer", display: "flex", alignItems: "center", color: "#888888" }}>
               <IoIosAttach size={18} />
             </label>
           </div>
@@ -688,6 +1031,15 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
         />
       )}
 
+      {showSaveSheet && (
+        <SaveToCategorySheet
+          postId={post.id}
+          currentCategoryId={savedCategoryId}
+          onClose={() => setShowSaveSheet(false)}
+          onSaved={handleSavedToCategory}
+        />
+      )}
+
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
@@ -705,6 +1057,18 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
         title="Hide User"
         message={`Hide posts from @${username}?`}
         confirmText="Hide"
+        confirmColor="#EF4444"
+      />
+
+      <ConfirmDialog
+        isOpen={pendingDeleteComment !== null}
+        onClose={() => setPendingDeleteComment(null)}
+        onConfirm={confirmDeleteComment}
+        title="Are you sure want to delete?"
+        message={pendingDeleteComment?.isReply
+          ? "This reply will be permanently removed."
+          : "This comment and all its replies will be permanently removed."}
+        confirmText="Delete"
         confirmColor="#EF4444"
       />
     </article>

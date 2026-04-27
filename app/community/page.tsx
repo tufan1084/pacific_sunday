@@ -58,6 +58,12 @@ export default function CommunityPage() {
   const [hiddenPostIds, setHiddenPostIds] = useState<number[]>([]);
   const [hiddenUserIds, setHiddenUserIds] = useState<number[]>([]);
 
+  // "Saved" tab loads via a different endpoint (/posts/saved) and replaces
+  // the post list rather than filtering. Lazy-loaded the first time the tab opens.
+  const [savedPosts, setSavedPosts] = useState<any[]>([]);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [savedLoadedOnce, setSavedLoadedOnce] = useState(false);
+
   const [isLg, setIsLg] = useState(true);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
@@ -179,20 +185,27 @@ export default function CommunityPage() {
       reconnection: true,
     });
 
+    // Helper: same per-post field update on both `posts` and `savedPosts` so the
+    // Saved tab reflects live events the same way the main feed does.
+    const updateBothLists = (postId: number, transform: (p: any) => any) => {
+      setPosts(prev => prev.map(p => p.id === postId ? transform(p) : p));
+      setSavedPosts(prev => prev.map(p => p.id === postId ? transform(p) : p));
+    };
+
     socket.on("post:liked", ({ postId, likeCount, userId }) => {
-      setPosts(prev => prev.map(p => p.id === postId ? {
+      updateBothLists(postId, (p) => ({
         ...p,
         _count: { ...p._count, likes: likeCount },
         isLikedByUser: userId === currentUserId ? true : p.isLikedByUser,
-      } : p));
+      }));
     });
 
     socket.on("post:unliked", ({ postId, likeCount, userId }) => {
-      setPosts(prev => prev.map(p => p.id === postId ? {
+      updateBothLists(postId, (p) => ({
         ...p,
         _count: { ...p._count, likes: likeCount },
         isLikedByUser: userId === currentUserId ? false : p.isLikedByUser,
-      } : p));
+      }));
     });
 
     socket.on("post:created", (newPost) => {
@@ -207,22 +220,30 @@ export default function CommunityPage() {
     });
 
     socket.on("comment:added", ({ postId, commentCount }) => {
-      setPosts(prev => prev.map(p => p.id === postId ? {
+      updateBothLists(postId, (p) => ({
         ...p,
         _count: { ...p._count, comments: commentCount },
-      } : p));
+      }));
+    });
+
+    socket.on("comment:deleted", ({ postId, commentCount }) => {
+      updateBothLists(postId, (p) => ({
+        ...p,
+        _count: { ...p._count, comments: commentCount },
+      }));
     });
 
     socket.on("post:pinned", ({ postId, isPinned }) => {
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, isPinned } : p));
+      updateBothLists(postId, (p) => ({ ...p, isPinned }));
     });
 
     socket.on("post:deleted", ({ postId }) => {
       setPosts(prev => prev.filter(p => p.id !== postId));
+      setSavedPosts(prev => prev.filter(p => p.id !== postId));
     });
 
     socket.on("post:shared", ({ postId, shareCount }) => {
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, shareCount } : p));
+      updateBothLists(postId, (p) => ({ ...p, shareCount }));
     });
 
     socket.on("team:created", (payload: any) => {
@@ -309,6 +330,13 @@ export default function CommunityPage() {
   }, [currentUserId, fetchTeams]);
 
   const visiblePosts = useMemo(() => {
+    // "Saved" tab uses a separate dataset fetched from /posts/saved.
+    if (activeTab === "Saved") {
+      return savedPosts
+        .filter((p) => !hiddenPostIds.includes(p.id))
+        .filter((p) => !hiddenUserIds.includes(p.user?.id ?? p.userId ?? -1));
+    }
+
     let list = posts.filter(p => !hiddenPostIds.includes(p.id));
     list = list.filter(p => !hiddenUserIds.includes(p.user?.id ?? p.userId ?? -1));
 
@@ -331,7 +359,25 @@ export default function CommunityPage() {
       const bt = new Date(b.createdAt).getTime();
       return bt - at;
     });
-  }, [posts, activeTab, hiddenPostIds, hiddenUserIds, tagOptions]);
+  }, [posts, savedPosts, activeTab, hiddenPostIds, hiddenUserIds, tagOptions]);
+
+  // Lazy-load saved posts the first time the user opens the Saved tab; refresh
+  // whenever they switch back to it (so unsaving a post elsewhere is reflected).
+  useEffect(() => {
+    if (activeTab !== "Saved") return;
+    let cancelled = false;
+    setSavedLoading(true);
+    api.posts.listSaved()
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.data) {
+          setSavedPosts(res.data.savedPosts.map((s) => s.post));
+        }
+        setSavedLoadedOnce(true);
+      })
+      .finally(() => { if (!cancelled) setSavedLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab]);
 
   const handleHidePost = (postId: number) => {
     setHiddenPostIds(prev => [...prev, postId]);
@@ -420,7 +466,7 @@ export default function CommunityPage() {
             <CommunityHeader />
             <CommunityFilters
               teams={teams}
-              tabs={["All Post", "Pinned", ...tagOptions.map(t => t.label)]}
+              tabs={["All Post", "Pinned", "Saved", ...tagOptions.map(t => t.label)]}
               activeFilter={activeFilter}
               activeTab={activeTab}
               onFilterChange={(f) => { setActiveFilter(f); setShowMembersSheet(false); }}
@@ -443,9 +489,9 @@ export default function CommunityPage() {
             />
           )}
 
-          {loading ? (
+          {loading || (activeTab === "Saved" && savedLoading && !savedLoadedOnce) ? (
             <div style={{ textAlign: "center", padding: "40px", color: "#94A3B8" }}>
-              Loading posts...
+              {activeTab === "Saved" ? "Loading saved posts..." : "Loading posts..."}
             </div>
           ) : visiblePosts.length === 0 ? (
             <div
@@ -459,7 +505,9 @@ export default function CommunityPage() {
               }}
             >
               <div style={{ fontSize: "15px", marginBottom: "6px" }}>
-                {activeTab === "Pinned"
+                {activeTab === "Saved"
+                  ? "You haven't saved any posts yet."
+                  : activeTab === "Pinned"
                   ? "No pinned posts yet."
                   : activeTab !== "All Post"
                   ? `No posts in ${activeTab} yet.`
@@ -468,7 +516,9 @@ export default function CommunityPage() {
                   : "No posts yet."}
               </div>
               <div style={{ fontSize: "13px", color: "#888" }}>
-                Be the first to post!
+                {activeTab === "Saved"
+                  ? "Tap the menu on any post and choose Save post."
+                  : "Be the first to post!"}
               </div>
             </div>
           ) : (

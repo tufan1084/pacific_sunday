@@ -33,7 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
   { icon: "challenges", label: "Challenges", href: "/challenges" },
   { icon: "bag", label: "My Bag", href: "/my-bag" },
   { icon: "profile", label: "Profile", href: "/profile" },
-  { icon: "notification", label: "Notification", href: "/notifications", badge: 80 },
+  { icon: "notification", label: "Notification", href: "/notifications" },
   { icon: "settings", label: "Settings", href: "/settings" },
 ];
 

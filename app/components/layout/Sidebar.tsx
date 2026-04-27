@@ -31,11 +31,16 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [newPostsCount, setNewPostsCount] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     fetchNewPostsCount();
-    // Refresh count every 30 seconds
-    const interval = setInterval(fetchNewPostsCount, 30000);
+    fetchUnreadNotifications();
+    // Refresh counts every 30 seconds
+    const interval = setInterval(() => {
+      fetchNewPostsCount();
+      fetchUnreadNotifications();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -57,6 +62,17 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       }
     } catch (error) {
       console.error('Failed to fetch new posts count:', error);
+    }
+  };
+
+  const fetchUnreadNotifications = async () => {
+    try {
+      const res = await api.notifications.getUnreadCount();
+      if (res.success) {
+        setUnreadNotifications((res.data as any)?.count || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch unread notifications:', error);
     }
   };
 
@@ -102,7 +118,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           {NAV_ITEMS.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             const isCommunity = item.href === "/community";
-            const displayBadge = isCommunity ? newPostsCount : item.badge;
+            const isNotification = item.href === "/notifications";
+            const displayBadge = isCommunity ? newPostsCount : isNotification ? unreadNotifications : item.badge;
 
             return (
               <Link

@@ -8,17 +8,17 @@ import { api, ApiNotification, NotificationType } from "@/app/services/api";
 import { SOCKET_URL } from "@/app/lib/constants";
 
 const ICON_FOR: Record<NotificationType, { icon: ReactElement; color: string }> = {
-  POST_LIKED:         { icon: <FiHeart size={18} />,         color: "#F87171" },
-  POST_COMMENTED:     { icon: <FiMessageCircle size={18} />, color: "#60A5FA" },
-  COMMENT_REPLIED:    { icon: <FiCornerDownRight size={18} />, color: "#60A5FA" },
-  USER_FOLLOWED:      { icon: <FiUserPlus size={18} />,      color: "#34D399" },
-  TEAM_INVITED:       { icon: <FiUsers size={18} />,         color: "#E8C96A" },
-  TEAM_JOIN_REQUEST:  { icon: <FiUserPlus size={18} />,      color: "#E8C96A" },
-  TEAM_JOIN_APPROVED: { icon: <FiCheck size={18} />,         color: "#34D399" },
-  TEAM_JOIN_REJECTED: { icon: <FiX size={18} />,             color: "#F87171" },
-  TEAM_ROLE_CHANGED:  { icon: <FiArrowUp size={18} />,       color: "#E8C96A" },
-  TEAM_REMOVED:       { icon: <FiUserMinus size={18} />,     color: "#F87171" },
-  TEAM_POST_CREATED:  { icon: <FiEdit3 size={18} />,         color: "#E8C96A" },
+  POST_LIKED:         { icon: <FiHeart size={14} />,         color: "#F87171" },
+  POST_COMMENTED:     { icon: <FiMessageCircle size={14} />, color: "#60A5FA" },
+  COMMENT_REPLIED:    { icon: <FiCornerDownRight size={14} />, color: "#60A5FA" },
+  USER_FOLLOWED:      { icon: <FiUserPlus size={14} />,      color: "#34D399" },
+  TEAM_INVITED:       { icon: <FiUsers size={14} />,         color: "#E8C96A" },
+  TEAM_JOIN_REQUEST:  { icon: <FiUserPlus size={14} />,      color: "#E8C96A" },
+  TEAM_JOIN_APPROVED: { icon: <FiCheck size={14} />,         color: "#34D399" },
+  TEAM_JOIN_REJECTED: { icon: <FiX size={14} />,             color: "#F87171" },
+  TEAM_ROLE_CHANGED:  { icon: <FiArrowUp size={14} />,       color: "#E8C96A" },
+  TEAM_REMOVED:       { icon: <FiUserMinus size={14} />,     color: "#F87171" },
+  TEAM_POST_CREATED:  { icon: <FiEdit3 size={14} />,         color: "#E8C96A" },
 };
 
 function describe(n: ApiNotification): string {
@@ -63,6 +63,19 @@ export default function NotificationsPage() {
   const currentUserId = typeof window !== "undefined"
     ? parseInt(localStorage.getItem("ps_user_id") || "0") : 0;
 
+  // Optimistic per-row delete. Drops the row immediately, calls the API, and
+  // restores it if the request fails so the user sees a clean rollback.
+  const handleDelete = async (id: number) => {
+    const snapshot = items;
+    setItems((prev) => prev.filter((n) => n.id !== id));
+    try {
+      const res = await api.notifications.delete(id);
+      if (!res.success) setItems(snapshot);
+    } catch {
+      setItems(snapshot);
+    }
+  };
+
   const load = useCallback(async (nextCursor?: number) => {
     if (nextCursor) setLoadingMore(true); else setLoading(true);
     try {
@@ -95,8 +108,8 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <div style={{ fontFamily: "var(--font-poppins), sans-serif", marginBottom: "30px" }}>
-        <span style={{ color: "#E8C96A", fontSize: "clamp(18px, 2.5vw, 25px)", fontWeight: 400 }}>Notifications</span>
+      <div style={{ fontFamily: "var(--font-poppins), sans-serif", marginBottom: "16px" }}>
+        <span style={{ color: "#E8C96A", fontSize: "clamp(16px, 2vw, 22px)", fontWeight: 400 }}>Notifications</span>
       </div>
 
       {loading && (
@@ -111,7 +124,7 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontFamily: "var(--font-poppins), sans-serif" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontFamily: "var(--font-poppins), sans-serif" }}>
         {items.map(n => {
           const meta = ICON_FOR[n.type] || ICON_FOR.POST_LIKED;
           return (
@@ -120,27 +133,41 @@ export default function NotificationsPage() {
               style={{
                 backgroundColor: "#13192A",
                 borderRadius: "5px",
-                padding: "20px",
+                padding: "10px 12px",
                 borderLeft: n.read ? "3px solid transparent" : "3px solid #E8C96A",
               }}
             >
-              <div className="flex items-start gap-3" style={{ flex: 1, minWidth: 0 }}>
+              <div className="flex items-center" style={{ flex: 1, minWidth: 0, gap: "10px" }}>
                 <div style={{
-                  width: "36px", height: "36px", borderRadius: "50%",
+                  width: "26px", height: "26px", borderRadius: "50%",
                   backgroundColor: "#060D1F", flexShrink: 0,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: meta.color,
                 }}>
                   {meta.icon}
                 </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ color: "#FFFFFF", fontSize: "clamp(13px, 1.4vw, 16px)", fontWeight: 400, marginBottom: "6px", lineHeight: 1.5 }}>
-                    {describe(n)}
-                  </div>
-                  <div style={{ color: "#74FF6D", fontSize: "clamp(11px, 1.1vw, 13px)", fontWeight: 400 }}>
-                    {timeAgo(n.createdAt)}
-                  </div>
+                <div style={{ color: "#FFFFFF", fontSize: "clamp(12px, 1.2vw, 13.5px)", fontWeight: 400, lineHeight: 1.4, flex: 1, minWidth: 0, wordBreak: "break-word" }}>
+                  {describe(n)}
                 </div>
+                <div style={{ color: "#74FF6D", fontSize: "clamp(10px, 1vw, 11.5px)", fontWeight: 400, flexShrink: 0, whiteSpace: "nowrap" }}>
+                  {timeAgo(n.createdAt)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(n.id)}
+                  aria-label="Delete notification"
+                  title="Delete"
+                  style={{
+                    background: "none", border: "none", padding: "2px",
+                    color: "rgba(255,255,255,0.4)", cursor: "pointer",
+                    display: "flex", alignItems: "center", flexShrink: 0,
+                    borderRadius: "4px",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#F87171"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.4)"; }}
+                >
+                  <FiX size={14} />
+                </button>
               </div>
             </div>
           );

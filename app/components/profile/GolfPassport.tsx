@@ -50,6 +50,9 @@ export default function GolfPassport({ profileData, golfPassport, onUpdate }: Go
   const fileRef = useRef<HTMLInputElement>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Pending file selected via the picker — uploads only when the user hits
+  // Save (handleSave). null = no new file pending.
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const update = (key: string, val: string) => setForm(p => ({ ...p, [key]: val }));
 
   const countries = getData();
@@ -88,9 +91,26 @@ export default function GolfPassport({ profileData, golfPassport, onUpdate }: Go
   const handleSave = async () => {
     setSaving(true);
     try {
+      // If the user picked a new file, upload it first and use the resulting
+      // photoUrl in the passport update. Otherwise reuse whatever photoUrl is
+      // already in `photo`.
+      let photoUrl = photo;
+      if (pendingPhotoFile) {
+        const upRes = await api.profile.uploadPhoto(pendingPhotoFile);
+        if (!upRes.success || !upRes.data?.photoUrl) {
+          showToast(upRes.message || "Failed to upload photo", "error");
+          setSaving(false);
+          return;
+        }
+        photoUrl = upRes.data.photoUrl;
+        setPhoto(photoUrl);
+        setPhotoPreview(resolveMediaUrl(photoUrl));
+        setPendingPhotoFile(null);
+      }
+
       const response = await api.profile.updateGolfPassport({
         ...form,
-        photoUrl: photo,
+        photoUrl,
       });
       if (response.success) {
         showToast("Golf Passport saved successfully", "success");
@@ -107,31 +127,13 @@ export default function GolfPassport({ profileData, golfPassport, onUpdate }: Go
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    // Just preview locally — actual upload happens when the user clicks Save.
     const blobUrl = URL.createObjectURL(file);
     setPhotoPreview(blobUrl);
-
-    try {
-      const response = await api.profile.uploadPhoto(file);
-      if (response.success && response.data?.photoUrl) {
-        setPhoto(response.data.photoUrl);
-        setPhotoPreview(resolveMediaUrl(response.data.photoUrl));
-        showToast("Profile photo updated", "success");
-        if (onUpdate) onUpdate();
-      } else {
-        showToast("Failed to upload photo", "error");
-        setPhoto(null);
-        setPhotoPreview(null);
-      }
-    } catch (error) {
-      console.error("Photo upload error:", error);
-      showToast("Error uploading photo", "error");
-      setPhoto(null);
-      setPhotoPreview(null);
-    }
+    setPendingPhotoFile(file);
   };
 
   return (

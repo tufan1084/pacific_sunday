@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { IoEllipsisHorizontal } from "react-icons/io5";
 import { BsPinAngle, BsPinAngleFill } from "react-icons/bs";
-import { FiTrash2, FiFlag, FiUserX, FiShare2, FiBookmark, FiLink } from "react-icons/fi";
+import { FiTrash2, FiFlag, FiUserX, FiShare2, FiBookmark, FiLink, FiEyeOff } from "react-icons/fi";
 
 interface PostActionMenuProps {
   isOwner: boolean;
@@ -19,6 +19,7 @@ interface PostActionMenuProps {
   onCopyLink: () => void;
   onSave: () => void;
   isSaved: boolean;
+  onHide: () => void;
 }
 
 export default function PostActionMenu(props: PostActionMenuProps) {
@@ -109,6 +110,10 @@ export default function PostActionMenu(props: PostActionMenuProps) {
           {!props.isOwner && (
             <>
               <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
+              <button style={itemStyle} onClick={props.onHide}>
+                <FiEyeOff size={16} color="#94A3B8" />
+                <span>Hide post</span>
+              </button>
               <button style={dangerStyle} onClick={props.onReport}>
                 <FiFlag size={16} />
                 <span>Report post</span>

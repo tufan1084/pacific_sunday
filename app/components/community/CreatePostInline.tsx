@@ -25,6 +25,10 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
   const [teamOpen, setTeamOpen] = useState(false);
   const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  // When the API returns 403 with code=POSTING_BLOCKED we don't want to fire
+  // and forget a toast — show a sticky banner inside the composer with the
+  // reason from moderation, and disable the inputs. Cleared on cancel.
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const teamDropdownRef = useRef<HTMLDivElement>(null);
@@ -126,8 +130,13 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
       });
       if (res.success) {
         showToast("Post created!", "success");
+        setBlockedMessage(null);
         reset();
         onPostCreated();
+      } else if ((res as any).code === "POSTING_BLOCKED" || /not allowed to post|blocked/i.test(res.message || "")) {
+        // Surface the moderation reason inline so the user understands why,
+        // not as a toast that vanishes after 3 seconds.
+        setBlockedMessage(res.message || "Your community posting access has been suspended.");
       } else {
         showToast(res.message || "Failed to create post", "error");
       }
@@ -334,13 +343,51 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
         </button>
       </div>
 
+      {/* Posting-blocked banner — visible when an admin has suspended this
+          user's ability to post. Sticky so the message doesn't vanish. */}
+      {blockedMessage && (
+        <div
+          role="alert"
+          className="flex items-start"
+          style={{
+            gap: "10px",
+            padding: "12px 14px",
+            margin: "0 0 12px",
+            background: "rgba(239,68,68,0.08)",
+            border: "1px solid rgba(239,68,68,0.30)",
+            borderRadius: "8px",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "2px" }}>
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: "#FCA5A5", fontSize: "12.5px", fontWeight: 600, marginBottom: "2px" }}>
+              Posting suspended
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.85)", fontSize: "12.5px", lineHeight: 1.55 }}>
+              {blockedMessage}
+            </div>
+          </div>
+          <button
+            onClick={() => setBlockedMessage(null)}
+            aria-label="Dismiss"
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: "2px", flexShrink: 0 }}
+          >
+            <IoClose size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Textarea */}
       <textarea
         ref={textareaRef}
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder="Share your thoughts, picks, or bag flex..."
-        disabled={loading}
+        placeholder={blockedMessage ? "You can't post right now." : "Share your thoughts, picks, or bag flex..."}
+        disabled={loading || !!blockedMessage}
         rows={4}
         style={{
           width: "100%",
@@ -473,13 +520,14 @@ export default function CreatePostInline({ onPostCreated, activeTeam, userTeams,
         </div>
         <button
           onClick={handleSubmit}
-          disabled={loading || !content.trim()}
+          disabled={loading || !content.trim() || !!blockedMessage}
           style={{
             backgroundColor: "#E8C96A", color: "#060D1F",
             border: "none", borderRadius: "5px",
             padding: "8px 22px", fontSize: "14px",
-            fontWeight: 500, cursor: loading || !content.trim() ? "not-allowed" : "pointer",
-            opacity: loading || !content.trim() ? 0.5 : 1,
+            fontWeight: 500,
+            cursor: loading || !content.trim() || blockedMessage ? "not-allowed" : "pointer",
+            opacity: loading || !content.trim() || blockedMessage ? 0.5 : 1,
             fontFamily: "inherit",
           }}
         >

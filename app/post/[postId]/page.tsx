@@ -59,6 +59,14 @@ export default function PublicPostPage() {
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentsOverride, setCommentsOverride] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    if (typeof window === "undefined" || !isAuthed) return;
+    const userId = localStorage.getItem("ps_user_id");
+    if (userId) setCurrentUserId(parseInt(userId));
+  }, [isAuthed]);
 
   // Share-link landing page lives outside AppShell. Check the token on mount so
   // we can render the real Header + Sidebar for logged-in viewers (header/sidebar
@@ -159,6 +167,19 @@ export default function PublicPostPage() {
       // silent — keep text so the user can retry
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!confirm("Delete this comment?")) return;
+    try {
+      const res = await api.posts.deleteComment(commentId);
+      if (res.success) {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+        setCommentsOverride((commentsOverride ?? post?._count?.comments ?? 0) - 1);
+      }
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete comment");
     }
   };
 
@@ -350,13 +371,26 @@ export default function PublicPostPage() {
                     {mediaUrls.map((url: string, idx: number) => {
                       const isVideo = /\.(mp4|mov|avi|mkv|webm)(\?|$)/i.test(url) || url.includes("/video/");
                       const fullUrl = resolveMediaUrl(url);
+                      if (isVideo) {
+                        return (
+                          <div key={idx} style={{ position: "relative", overflow: "hidden", aspectRatio: "16 / 9", backgroundColor: "#000" }}>
+                            <video src={fullUrl} controls style={{ width: "100%", height: "100%", display: "block", objectFit: "contain", backgroundColor: "#000" }} />
+                          </div>
+                        );
+                      }
                       return (
-                        <div key={idx} style={{ position: "relative", overflow: "hidden", maxHeight: "520px", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#060D1F" }}>
-                          {isVideo ? (
-                            <video src={fullUrl} controls style={{ width: "100%", height: "auto", maxHeight: "520px", display: "block", objectFit: "cover" }} />
-                          ) : (
-                            <img src={fullUrl} alt="Post media" style={{ width: "100%", height: "auto", maxHeight: "520px", display: "block", objectFit: "cover" }} />
-                          )}
+                        <div
+                          key={idx}
+                          style={{
+                            position: "relative",
+                            overflow: "hidden",
+                            backgroundColor: "#000",
+                            aspectRatio: mediaUrls.length === 1 ? "4 / 3" : "1 / 1",
+                            maxHeight: mediaUrls.length === 1 ? "440px" : "320px",
+                            width: "100%",
+                          }}
+                        >
+                          <img src={fullUrl} alt="Post media" loading="lazy" style={{ width: "100%", height: "100%", display: "block", objectFit: "cover", objectPosition: "center" }} />
                         </div>
                       );
                     })}
@@ -426,12 +460,11 @@ export default function PublicPostPage() {
                 {isAuthed && commentsOpen && (
                   <div style={{ padding: "8px 16px 16px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                     <div className="flex items-start" style={{ gap: "8px", marginBottom: comments.length > 0 || loadingComments ? "14px" : "0" }}>
-                      <input
-                        type="text"
+                      <textarea
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleAddComment(); }}
                         placeholder="Write a comment…"
+                        rows={2}
                         disabled={submittingComment}
                         style={{
                           flex: 1,
@@ -443,6 +476,10 @@ export default function PublicPostPage() {
                           fontSize: "13px",
                           fontFamily: "var(--font-poppins), sans-serif",
                           outline: "none",
+                          resize: "vertical",
+                          minHeight: "44px",
+                          maxHeight: "200px",
+                          lineHeight: "1.4",
                         }}
                       />
                       <button
@@ -475,18 +512,41 @@ export default function PublicPostPage() {
                           const cUsername = c.user?.username;
                           const cPhoto = c.user?.profile?.golfPassport?.photoUrl || null;
                           const cInitials = (cAuthor || "?").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+                          const isCommentAuthor = currentUserId === c.userId;
+                          const isPostOwner = currentUserId === post?.user?.id;
+                          const canDelete = isCommentAuthor || isPostOwner;
                           return (
                             <div key={c.id} className="flex items-start" style={{ gap: "10px" }}>
                               <div style={{ width: "32px", height: "32px", borderRadius: "6px", backgroundColor: "#060D1F", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, color: "#E8C96A", flexShrink: 0, overflow: "hidden" }}>
                                 {cPhoto ? <img src={resolveMediaUrl(cPhoto)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : cInitials}
                               </div>
-                              <div style={{ flex: 1, minWidth: 0, backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "8px", padding: "8px 12px" }}>
-                                <div className="flex items-center" style={{ gap: "6px", marginBottom: "2px" }}>
-                                  <span style={{ color: "#E8C96A", fontWeight: 600, fontSize: "12.5px" }}>{cAuthor}</span>
-                                  {cUsername && <span style={{ color: "#888", fontSize: "11px" }}>@{cUsername}</span>}
-                                  <span style={{ color: "#666", fontSize: "11px" }}>· {timeAgo(c.createdAt)}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "8px", padding: "8px 12px" }}>
+                                  <div className="flex items-center justify-between" style={{ marginBottom: "2px" }}>
+                                    <div className="flex items-center" style={{ gap: "6px" }}>
+                                      <span style={{ color: "#E8C96A", fontWeight: 600, fontSize: "12.5px" }}>{cAuthor}</span>
+                                      {cUsername && <span style={{ color: "#888", fontSize: "11px" }}>@{cUsername}</span>}
+                                      <span style={{ color: "#666", fontSize: "11px" }}>· {timeAgo(c.createdAt)}</span>
+                                    </div>
+                                    {canDelete && (
+                                      <button
+                                        onClick={() => handleDeleteComment(c.id)}
+                                        style={{
+                                          background: "none",
+                                          border: "none",
+                                          color: "#EF4444",
+                                          fontSize: "11px",
+                                          cursor: "pointer",
+                                          padding: "2px 6px",
+                                          fontWeight: 500,
+                                        }}
+                                      >
+                                        Delete
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div style={{ color: "#FFFFFF", fontSize: "13px", lineHeight: 1.5, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>{c.content}</div>
                                 </div>
-                                <div style={{ color: "#FFFFFF", fontSize: "13px", lineHeight: 1.5, wordBreak: "break-word" }}>{c.content}</div>
                               </div>
                             </div>
                           );

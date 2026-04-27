@@ -79,7 +79,11 @@ export default function NotificationsDropdown() {
       ]);
       if (nRes.success) {
         const data = nRes.data as any;
-        setItems(data?.notifications || []);
+        // Bell dropdown only shows unread notifications. Read ones live on
+        // the dedicated /notifications page (linked at the bottom of the
+        // dropdown). Mark-as-read removes the row from the bell.
+        const all = (data?.notifications || []) as ApiNotification[];
+        setItems(all.filter((n) => !n.read));
         setUnread(data?.unreadCount ?? 0);
       }
       if (iRes.success) {
@@ -147,7 +151,8 @@ export default function NotificationsDropdown() {
   const handleMarkAllRead = async () => {
     const res = await api.notifications.markAllRead();
     if (res.success) {
-      setItems(prev => prev.map(n => ({ ...n, read: true })));
+      // Drop them from the bell — the user can still see them on /notifications.
+      setItems([]);
       setUnread(0);
     }
   };
@@ -155,7 +160,8 @@ export default function NotificationsDropdown() {
   const handleItemClick = async (n: ApiNotification) => {
     if (!n.read) {
       api.notifications.markRead(n.id);
-      setItems(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+      // Remove from the bell dropdown the moment it's marked read.
+      setItems(prev => prev.filter(x => x.id !== n.id));
       setUnread(u => Math.max(0, u - 1));
     }
   };
@@ -283,30 +289,30 @@ export default function NotificationsDropdown() {
                 key={n.id}
                 onClick={() => handleItemClick(n)}
                 style={{
-                  display: "flex", gap: "10px", padding: "10px 16px",
+                  display: "flex", gap: "8px", padding: "7px 12px",
                   borderBottom: "1px solid rgba(255,255,255,0.05)",
                   cursor: "pointer",
                   backgroundColor: n.read ? "transparent" : "rgba(232,201,106,0.05)",
                 }}
               >
                 <div style={{
-                  width: "28px", height: "28px", borderRadius: "50%",
+                  width: "22px", height: "22px", borderRadius: "50%",
                   backgroundColor: "#060D1F",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  color: meta.color, flexShrink: 0, marginTop: "2px",
+                  color: meta.color, flexShrink: 0, marginTop: "1px",
                 }}>
                   {meta.icon}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: "#FFF", fontSize: "12.5px", lineHeight: 1.4 }}>
+                  <div style={{ color: "#FFF", fontSize: "11.5px", lineHeight: 1.35 }}>
                     {describe(n)}
                   </div>
-                  <div style={{ color: "#888", fontSize: "11px", marginTop: "3px" }}>
+                  <div style={{ color: "#888", fontSize: "10px", marginTop: "2px" }}>
                     {timeAgo(n.createdAt)}
                   </div>
                 </div>
                 {!n.read && (
-                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#E8C96A", alignSelf: "center", flexShrink: 0 }} />
+                  <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#E8C96A", alignSelf: "center", flexShrink: 0 }} />
                 )}
               </div>
             );

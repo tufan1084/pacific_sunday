@@ -19,9 +19,13 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<Api
   // For these, pass the error through instead of auto-logging out.
   const isAuthAttempt = endpoint.startsWith("/auth/login") || endpoint.startsWith("/auth/register");
 
-  // Auto-logout on 401/403 for any protected endpoint — covers both expired sessions
-  // (token present but invalid) and missing-token access to protected pages.
-  if ((response.status === 401 || response.status === 403) && !isAuthAttempt) {
+  // Auto-logout on 401 ONLY. 401 = "your token is missing/invalid/expired" so a
+  // forced re-login is appropriate. 403 = "we know who you are, you can't do
+  // THIS specific thing" (e.g. blocked from posting, can't pin someone else's
+  // post, can't delete someone else's comment). 403s should bubble back to the
+  // caller as a normal error so the UI can show a proper message — kicking
+  // the user to /login on every 403 was wrong.
+  if (response.status === 401 && !isAuthAttempt) {
     if (typeof window !== "undefined" && window.location.pathname !== "/login") {
       localStorage.removeItem("ps_token");
       localStorage.removeItem("ps_user_id");
@@ -183,6 +187,16 @@ export const api = {
     like: (postId: number) => fetchApi(`/posts/${postId}/like`, { method: "POST" }),
     addComment: (postId: number, content: string, parentId?: number) =>
       fetchApi(`/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ content, parentId }) }),
+    editComment: (commentId: number, content: string) =>
+      fetchApi<{ comment: any }>(`/posts/comments/${commentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content }),
+      }),
+    deleteComment: (commentId: number) =>
+      fetchApi<{ commentId: number; postId: number; commentCount: number }>(
+        `/posts/comments/${commentId}`,
+        { method: "DELETE" },
+      ),
     getComments: (postId: number) => fetchApi(`/posts/${postId}/comments`),
     togglePin: (postId: number) =>
       fetchApi<{ isPinned: boolean }>(`/posts/${postId}/pin`, { method: "POST" }),
@@ -192,6 +206,38 @@ export const api = {
       fetchApi<{ postId: number; shareCount: number }>(`/posts/${postId}/share`, { method: "POST" }),
     report: (postId: number, reason: string, details?: string) =>
       fetchApi(`/posts/${postId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) }),
+    hide: (postId: number) =>
+      fetchApi(`/posts/${postId}/hide`, { method: "POST" }),
+    unhide: (postId: number) =>
+      fetchApi(`/posts/${postId}/hide`, { method: "DELETE" }),
+    save: (postId: number, categoryId: number | null) =>
+      fetchApi<{ savedPost: { id: number; postId: number; categoryId: number | null; createdAt: string } }>(
+        `/posts/${postId}/save`,
+        { method: "POST", body: JSON.stringify({ categoryId }) },
+      ),
+    unsave: (postId: number) =>
+      fetchApi(`/posts/${postId}/save`, { method: "DELETE" }),
+    listSaved: (categoryId?: number | "uncategorized") =>
+      fetchApi<{ savedPosts: ApiSavedPost[] }>(
+        `/posts/saved${categoryId !== undefined ? `?categoryId=${categoryId}` : ""}`,
+      ),
+  },
+
+  savedCategories: {
+    list: () =>
+      fetchApi<{ categories: ApiSavedCategory[]; uncategorizedCount: number }>("/saved-categories"),
+    create: (name: string) =>
+      fetchApi<{ category: ApiSavedCategory }>("/saved-categories", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    update: (id: number, data: { name?: string; sortOrder?: number }) =>
+      fetchApi<{ category: ApiSavedCategory }>(`/saved-categories/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) =>
+      fetchApi(`/saved-categories/${id}`, { method: "DELETE" }),
   },
 
   teams: {
@@ -264,11 +310,13 @@ export const api = {
         unreadCount: number;
       }>(`/notifications${qs ? `?${qs}` : ""}`);
     },
-    unreadCount: () => fetchApi<{ count: number }>("/notifications/unread-count"),
+    getUnreadCount: () => fetchApi<{ count: number }>("/notifications/unread-count"),
     markRead: (id: number) =>
       fetchApi(`/notifications/${id}/read`, { method: "POST" }),
     markAllRead: () =>
       fetchApi("/notifications/read-all", { method: "POST" }),
+    delete: (id: number) =>
+      fetchApi(`/notifications/${id}`, { method: "DELETE" }),
   },
 
   follows: {
@@ -459,4 +507,29 @@ export interface ApiUserProfile {
   postCount: number;
   isFollowing: boolean;
   isSelf: boolean;
+}
+
+export interface ApiSavedCategory {
+  id: number;
+  name: string;
+  sortOrder: number;
+  postCount?: number;
+  createdAt?: string;
+}
+
+export interface ApiSavedPost {
+  savedAt: string;
+  category: { id: number; name: string } | null;
+  post: {
+    id: number;
+    content: string;
+    mediaUrls: unknown;
+    shareCount: number;
+    createdAt: string;
+    user: { id: number; username: string; profile: { name: string; golfPassport?: { photoUrl: string | null } | null } | null };
+    _count: { likes: number; comments: number };
+    tagSlugs: string[];
+    isSavedByMe: boolean;
+    myCategoryId: number | null;
+  };
 }
