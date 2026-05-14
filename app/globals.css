@@ -1,0 +1,346 @@
+@import "tailwindcss";
+
+
+
+@theme inline {
+  --color-ps-bg: #020617;
+  --color-ps-bg-deep: #030b1f;
+  --color-ps-card: #0b1326;
+  --color-ps-card-soft: #111a33;
+  --color-ps-card-hover: #0f1a30;
+  --color-ps-border: rgba(255, 255, 255, 0.04);
+  --color-ps-border-light: rgba(255, 255, 255, 0.08);
+  --color-ps-gold: #E6C36A;
+  --color-ps-gold-dark: #c9a84e;
+  --color-ps-gold-light: #f0d48a;
+  --color-ps-text: #FFFFFF;
+  --color-ps-text-secondary: #94A3B8;
+  --color-ps-text-muted: #64748B;
+  --color-ps-green: #4ADE80;
+  --color-ps-red: #EF4444;
+  --color-ps-red-muted: #F87171;
+  --color-ps-sidebar: #030812;
+  --color-ps-sidebar-hover: rgba(255, 255, 255, 0.05);
+  --color-ps-topnav: #020617;
+  --color-ps-progress-track: #1e293b;
+
+  --font-sans: "Poppins", "Inter", system-ui, -apple-system, sans-serif;
+}
+
+*, *::before, *::after {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: linear-gradient(180deg, #020617 0%, #020617 40%, #030b1f 100%);
+  color: var(--color-ps-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  /* iOS Safari: prevent text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* iOS Safari: prevent tap highlight flash */
+  -webkit-tap-highlight-color: transparent;
+  /* iOS Safari: use dynamic viewport height */
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* iOS Safari: stop rubber-band scroll & PWA pull-to-refresh */
+  overscroll-behavior-y: none;
+}
+
+html {
+  overflow-x: hidden;
+  scrollbar-color: rgba(255, 255, 255, 0.08) #020617;
+  height: 100%;
+  height: 100dvh;
+  background-color: #01050D;
+  /* iOS Safari: prevent text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* iOS Safari: stop rubber-band scroll at the document level */
+  overscroll-behavior-y: none;
+}
+
+/* ── iOS Safari fixes — phone-sized touch screens ──────────────────────
+   Applied on pointer:coarse + max-width:768px so they affect iPhones/Androids
+   in portrait but never desktop. The big one is the input font-size: iOS
+   Safari auto-zooms on focus whenever an input is < 16px, which is why the
+   page appears to "auto-zoom" when tapping a field. Forcing 16px on phones
+   eliminates that zoom without changing desktop appearance. */
+@media (pointer: coarse) and (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  textarea,
+  select,
+  [contenteditable="true"],
+  [contenteditable=""] {
+    /* 16px is the iOS auto-zoom threshold — must win over inline styles */
+    font-size: 16px !important;
+  }
+}
+
+/* Disable iOS double-tap-to-zoom and remove the 300ms tap delay on
+   interactive controls. Keep text selectable elsewhere. */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+label[for] {
+  touch-action: manipulation;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Hide scrollbar while keeping scroll (used for mobile horizontal pill rows) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Past Challenges scrollbar */
+.past-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+
+.past-scroll::-webkit-scrollbar-track {
+  background: #313131;
+}
+
+.past-scroll::-webkit-scrollbar-thumb {
+  background: #999486;
+  border-radius: 999px;
+}
+
+.past-scroll::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+::selection {
+  background: rgba(230, 195, 106, 0.3);
+  color: white;
+}
+
+/* PWA Install Banner animation */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+/* Leaderboard table scrollbar — no arrows */
+.leaderboard-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+
+.leaderboard-scroll::-webkit-scrollbar-track {
+  background: #313131;
+}
+
+.leaderboard-scroll::-webkit-scrollbar-thumb {
+  background: #999486;
+  border-radius: 999px;
+}
+
+.leaderboard-scroll::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+/* ── NFC Entry Page (/n) ─────────────────────────────── */
+.nfc-container {
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.nfc-logo {
+  width: 140px;
+  height: auto;
+}
+
+.nfc-input {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.nfc-btn {
+  font-size: 14px;
+  padding: 12px 16px;
+}
+
+/* Small phones (< 380px) — tighter spacing */
+@media (max-width: 379px) {
+  .nfc-container {
+    max-width: 100%;
+  }
+
+  .nfc-logo {
+    width: 120px;
+  }
+
+  .nfc-input {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .nfc-btn {
+    font-size: 13px;
+    padding: 11px 14px;
+  }
+}
+
+/* Tablets & up (>= 640px) — more breathing room */
+@media (min-width: 640px) {
+  .nfc-container {
+    max-width: 460px;
+  }
+
+  .nfc-logo {
+    width: 180px;
+  }
+
+  .nfc-input {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .nfc-btn {
+    font-size: 15px;
+    padding: 14px 20px;
+  }
+}
+
+/* Paired form fields — single column by default */
+.nfc-form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Large screens (>= 1024px) — wider card, 2-col form */
+@media (min-width: 1024px) {
+  .nfc-container {
+    max-width: 620px;
+  }
+
+  .nfc-form-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .nfc-input {
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  .nfc-btn {
+    font-size: 14px;
+    padding: 11px 16px;
+  }
+}
+
+/* Minimal scrollbar for tier containers */
+.tier-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 201, 106, 0.4) transparent;
+  overflow-x: hidden;
+}
+.tier-scroll::-webkit-scrollbar {
+  width: 3px;
+  height: 0;
+}
+.tier-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tier-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(232, 201, 106, 0.35);
+  border-radius: 3px;
+}
+.tier-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(232, 201, 106, 0.6);
+}
+
+/* Main content padding — 12px on mobile, 20px on lg+ */
+.main-content {
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  /* iOS: keep child scroll from chaining to the document and triggering bounce */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 1024px) {
+  .main-content {
+    padding: 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Responsive display utilities */
+@media (max-width: 767px) {
+  .md\:block {
+    display: none !important;
+  }
+  .md\:hidden {
+    display: block !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:hidden {
+    display: none !important;
+  }
+  .md\:block {
+    display: block !important;
+  }
+}
+
+/* contenteditable inputs (EditableInput): show placeholder when empty */
+.editable-input:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(148, 163, 184, 0.7);
+  pointer-events: none;
+  display: inline-block;
+}
+.editable-input:focus:empty::before {
+  opacity: 0.6;
+}
