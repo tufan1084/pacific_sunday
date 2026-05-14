@@ -1,8 +1,8 @@
-const CACHE_NAME = "pacific-sunday-v5";
+const CACHE_NAME = "pacific-sunday-v7";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
-  "/logo.png",
+  "/data/LOGO-PHOTO.png",
   "/offline",
 ];
 
@@ -83,8 +83,8 @@ self.addEventListener("push", (event) => {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: data.icon || "/logo.png",
-      badge: "/logo.png",
+      icon: data.icon || "/data/LOGO-PHOTO.png",
+      badge: "/data/LOGO-PHOTO.png",
       vibrate: [100, 50, 100],
       data: {
         url: data.url || "/",

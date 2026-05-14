@@ -115,7 +115,7 @@ export default function PublicPostPage() {
           <div className="flex items-center w-full gap-3" style={{ height: "clamp(60px, 8vw, 90px)" }}>
             <div className="flex items-center flex-shrink-0" style={{ width: "clamp(200px, 22vw, 275px)", paddingLeft: "20px" }}>
               <div style={{ width: "clamp(120px, 14vw, 220px)", height: "clamp(36px, 5vw, 65px)", position: "relative", flexShrink: 0 }}>
-                <Image src="/logo.png" alt="Pacific Sunday" fill style={{ objectFit: "contain", objectPosition: "left center" }} priority />
+                <Image src="/data/LOGO-PHOTO.png" alt="Pacific Sunday" fill style={{ objectFit: "contain", objectPosition: "left center" }} priority />
               </div>
             </div>
             <div className="flex-1" />

@@ -67,26 +67,19 @@ const EditableInput = forwardRef<EditableInputHandle, EditableInputProps>(functi
   // 1. Images/GIFs pasted from clipboard
   // 2. GIFs inserted from Gboard / iOS keyboard GIF picker (delivered as paste events)
   // 3. Plain text paste (strips HTML)
-  //
-  // The native listener (not React synthetic) is required because:
-  // - Android Gboard GIF picker fires a real DOM paste event with image/gif
-  // - iOS keyboard GIF picker does the same
-  // - React's synthetic delegation can miss these on some mobile browsers
   useEffect(() => {
     const el = elRef.current;
     if (!el) return;
-    const handler = (e: ClipboardEvent) => {
+
+    const handlePaste = (e: ClipboardEvent) => {
       const dt = e.clipboardData;
       if (!dt) return;
       const items = Array.from(dt.items || []);
-
-      // Check for any image type — includes image/gif from keyboard GIF pickers
       const imageItem = items.find(i => i.type.startsWith("image/"));
       if (imageItem) {
         const file = imageItem.getAsFile();
         if (file) {
           e.preventDefault();
-          // Route GIFs to onGifInsert if provided, otherwise fall back to onImagePaste
           if (file.type === "image/gif" && onGifInsertRef.current) {
             onGifInsertRef.current(file);
           } else if (onImagePasteRef.current) {
@@ -95,16 +88,47 @@ const EditableInput = forwardRef<EditableInputHandle, EditableInputProps>(functi
           return;
         }
       }
-
-      // Plain-text paste — strip HTML formatting
       const text = dt.getData("text/plain");
       if (text) {
         e.preventDefault();
         document.execCommand("insertText", false, text);
       }
     };
-    el.addEventListener("paste", handler);
-    return () => el.removeEventListener("paste", handler);
+
+    // Gboard / iOS keyboard GIF picker fires InputEvent with inputType
+    // "insertFromPaste" or "insertContent" and a DataTransfer on the event.
+    // This is separate from the clipboard paste event above.
+    const handleInputEvent = (e: Event) => {
+      const ie = e as InputEvent;
+      if (
+        ie.inputType === "insertFromPaste" ||
+        ie.inputType === "insertContent" ||
+        ie.inputType === "insertFromPasteAsQuotation"
+      ) {
+        const dt = (ie as any).dataTransfer as DataTransfer | null;
+        if (!dt) return;
+        const items = Array.from(dt.items || []);
+        const imageItem = items.find(i => i.type.startsWith("image/"));
+        if (imageItem) {
+          const file = imageItem.getAsFile();
+          if (file) {
+            e.preventDefault();
+            if (file.type === "image/gif" && onGifInsertRef.current) {
+              onGifInsertRef.current(file);
+            } else if (onImagePasteRef.current) {
+              onImagePasteRef.current(file);
+            }
+          }
+        }
+      }
+    };
+
+    el.addEventListener("paste", handlePaste);
+    el.addEventListener("beforeinput", handleInputEvent);
+    return () => {
+      el.removeEventListener("paste", handlePaste);
+      el.removeEventListener("beforeinput", handleInputEvent);
+    };
   }, []);
 
   const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {

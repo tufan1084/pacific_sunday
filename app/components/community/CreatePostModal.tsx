@@ -397,6 +397,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated, active
             value={content}
             onChange={(v) => setContent(v.slice(0, 500))}
             onImagePaste={(file) => addFiles([normalizeImageFile(file)])}
+            onGifInsert={(file) => addFiles([file])}
             placeholder={blockedMessage ? "You can't post right now." : "Share your thoughts, picks, or bag flex..."}
             disabled={loading || !!blockedMessage}
             multiline
