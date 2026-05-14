@@ -48,9 +48,37 @@ export default function BagDetails({ bagsData }: BagDetailsProps) {
 
           {details.map((item, i) => (
             <div key={i}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between" style={{ paddingTop: "clamp(12px, 2vw, 16px)", paddingBottom: "clamp(12px, 2vw, 16px)", gap: "clamp(4px, 1vw, 16px)" }}>
-                <span style={{ color: "#FFFFFF", fontSize: "clamp(13px, 1.4vw, 16px)", fontWeight: 400 }}>{item.label}</span>
-                <span style={{ color: item.color || "#FFFFFF", fontSize: "clamp(13px, 1.4vw, 16px)", fontWeight: 500, textAlign: "right", wordBreak: "break-all" }}>{item.value}</span>
+              <div
+                className="flex flex-row items-center justify-between"
+                style={{
+                  paddingTop: "clamp(12px, 2vw, 16px)",
+                  paddingBottom: "clamp(12px, 2vw, 16px)",
+                  gap: "clamp(8px, 2vw, 16px)",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: "clamp(12px, 1.4vw, 16px)",
+                    fontWeight: 400,
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.label}
+                </span>
+                <span
+                  style={{
+                    color: item.color || "#FFFFFF",
+                    fontSize: "clamp(12px, 1.4vw, 16px)",
+                    fontWeight: 500,
+                    textAlign: "right",
+                    wordBreak: "break-all",
+                    minWidth: 0,
+                    flexShrink: 1,
+                  }}
+                >
+                  {item.value}
+                </span>
               </div>
               {i < details.length - 1 && <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.08)", marginLeft: "clamp(-16px, -3vw, -24px)", marginRight: "clamp(-16px, -3vw, -24px)" }} />}
             </div>

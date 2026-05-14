@@ -45,12 +45,47 @@ export default function NFCScanHistory({ bagsData }: NFCScanHistoryProps) {
         // Anything beyond is reachable by scrolling within the panel — keeps
         // the my-bag layout from stretching off-screen when a user has dozens
         // of scans.
-        <div style={{ overflowY: "auto", overflowX: "hidden", maxHeight: "280px", scrollbarWidth: "thin", scrollbarColor: "#999486 #313131", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehavior: "contain" }}>
+        <div style={{ overflowY: "auto", overflowX: "hidden", maxHeight: "280px", scrollbarWidth: "thin", scrollbarColor: "#999486 #313131", touchAction: "pan-y", overscrollBehavior: "contain" }}>
           {scanHistory.map((scan: { date: string; device: string }, i: number) => (
             <div key={i}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between" style={{ minHeight: "56px", paddingTop: "clamp(12px, 2vw, 16px)", paddingBottom: "clamp(12px, 2vw, 16px)", paddingLeft: "clamp(16px, 3vw, 24px)", paddingRight: "clamp(16px, 3vw, 24px)", gap: "clamp(4px, 1vw, 12px)", boxSizing: "border-box" }}>
-                <div style={{ color: "#FFFFFF", fontSize: "clamp(12px, 1.3vw, 14px)", fontWeight: 400 }}>{scan.date}</div>
-                <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "clamp(11px, 1.2vw, 13px)", fontWeight: 400, textAlign: "right" }}>{scan.device}</span>
+              <div
+                className="flex flex-row items-center justify-between"
+                style={{
+                  minHeight: "56px",
+                  paddingTop: "clamp(12px, 2vw, 16px)",
+                  paddingBottom: "clamp(12px, 2vw, 16px)",
+                  paddingLeft: "clamp(16px, 3vw, 24px)",
+                  paddingRight: "clamp(16px, 3vw, 24px)",
+                  gap: "clamp(8px, 2vw, 16px)",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: "clamp(12px, 1.3vw, 14px)",
+                    fontWeight: 400,
+                    flexShrink: 0,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {scan.date}
+                </div>
+                <span
+                  style={{
+                    color: "rgba(255,255,255,0.7)",
+                    fontSize: "clamp(11px, 1.2vw, 13px)",
+                    fontWeight: 400,
+                    textAlign: "right",
+                    minWidth: 0,
+                    flexShrink: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {scan.device}
+                </span>
               </div>
               {i < scanHistory.length - 1 && <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.08)", marginLeft: "clamp(-16px, -3vw, -24px)", marginRight: "clamp(-16px, -3vw, -24px)" }} />}
             </div>

@@ -22,16 +22,26 @@ interface UaDataLike {
 export async function collectUaHints(): Promise<UaHints | null> {
   if (typeof navigator === "undefined") return null;
   const uaData = (navigator as Navigator & { userAgentData?: UaDataLike }).userAgentData;
-  if (!uaData || typeof uaData.getHighEntropyValues !== "function") return null;
+  if (!uaData || typeof uaData.getHighEntropyValues !== "function") {
+    // userAgentData is exposed only in secure contexts (HTTPS / localhost).
+    // On plain HTTP it's undefined and we have no way to get the real model.
+    console.warn(
+      "[uaHints] navigator.userAgentData unavailable — likely an insecure (HTTP) context. Device model will fall back to UA parsing.",
+    );
+    return null;
+  }
 
   try {
     const res = await uaData.getHighEntropyValues(["model", "platform", "platformVersion"]);
-    return {
+    const hints = {
       model: res.model?.trim() || null,
       platform: res.platform?.trim() || null,
       platformVersion: res.platformVersion?.trim() || null,
     };
-  } catch {
+    console.info("[uaHints] collected:", hints);
+    return hints;
+  } catch (err) {
+    console.warn("[uaHints] getHighEntropyValues threw:", err);
     return null;
   }
 }

@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
+import { RefreshProvider, useGlobalRefresh } from "@/app/context/RefreshContext";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import GolfLoader from "@/app/components/ui/GolfLoader";
 import { api } from "@/app/services/api";
 import { cache, CACHE_TTL } from "@/app/services/cache";
+import { usePullToRefresh } from "@/app/hooks/usePullToRefresh";
 
 // Pre-warm cache for the most visited pages in the background
 async function prefetchCommonData() {
@@ -40,7 +42,10 @@ interface AppShellProps {
 
 const AUTH_ROUTES = ["/n", "/login"];
 
-// Pages that are "root" tabs — pressing back here should not navigate further back
+// Pages that are "root" tabs — pressing back here should not navigate further
+// back, and the in-app back arrow is hidden. Anything else gets a back arrow
+// in the header so iOS standalone PWA users (no hardware back, no browser
+// chrome) can navigate up.
 const ROOT_PATHS = ["/", "/community", "/fantasy-golf", "/leaderboard", "/my-bag"];
 
 export default function AppShell({ children }: AppShellProps) {
@@ -52,27 +57,31 @@ export default function AppShell({ children }: AppShellProps) {
   const isAuthRoute = AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
   const isMessagesPage = pathname === "/messages";
 
-  // PWA back-button support: push a sentinel state on mount so the back
-  // gesture always has somewhere to go, then intercept popstate to call
-  // router.back() instead of letting the PWA close or do nothing.
+  // Keep the user inside the PWA when they press the system back button on a
+  // root tab (Android hardware back, browser back). Without a sentinel the
+  // back press would close the PWA / leave the site entirely.
+  //
+  // We only push a sentinel while ON a root path — pushing on every route
+  // change inflated history (each subpage had a phantom entry) and confused
+  // the iOS edge-swipe-back gesture: a swipe consumed the sentinel but the
+  // URL didn't change, so users felt their swipe "did nothing." With the
+  // sentinel limited to root tabs, the natural browser-back behavior works
+  // correctly on subpages on every platform. iOS PWA standalone mode (no
+  // gesture, no hardware key) is handled by the in-app back arrow in Header.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!ROOT_PATHS.includes(pathname)) return;
 
-    // Push a forward state so there's always a history entry ahead of us
-    window.history.pushState({ pwaPage: pathname }, "");
+    window.history.pushState({ rootSentinel: pathname }, "");
 
-    const handlePopState = (e: PopStateEvent) => {
-      // If we're on a root tab, re-push the sentinel so back does nothing
-      if (ROOT_PATHS.includes(pathname)) {
-        window.history.pushState({ pwaPage: pathname }, "");
-        return;
-      }
-      router.back();
+    const handlePopState = () => {
+      // Still on root — re-push so the next back press stays put.
+      window.history.pushState({ rootSentinel: pathname }, "");
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [pathname, router]);
+  }, [pathname]);
 
   // Redirect unauthenticated users to /login on protected pages
   useEffect(() => {
@@ -98,31 +107,48 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div 
-      className="flex flex-col overflow-hidden" 
-      style={{ 
-        height: "100dvh",
-      }}
-    >
-      <Header onMenuToggle={() => setSidebarOpen((prev) => !prev)} />
+    <RefreshProvider>
+      <div
+        className="flex flex-col overflow-hidden"
+        style={{
+          height: "100dvh",
+        }}
+      >
+        <Header
+          onMenuToggle={() => setSidebarOpen((prev) => !prev)}
+          showBack={!ROOT_PATHS.includes(pathname)}
+        />
 
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        <main
-          className="flex-1 min-w-0 main-content"
-          style={{ 
-            padding: isMessagesPage ? "0" : undefined,
-            paddingBottom: isMessagesPage ? "0" : undefined,
-            backgroundColor: "#060D1F",
-            overflow: isMessagesPage ? "hidden" : "auto",
-            WebkitOverflowScrolling: "touch",
-            height: isMessagesPage ? "calc(100dvh - 60px)" : "auto"
-          }}
-        >
-          {children}
-        </main>
+          <main
+            className="flex-1 min-w-0 main-content"
+            style={{
+              padding: isMessagesPage ? "0" : undefined,
+              paddingBottom: isMessagesPage ? "0" : undefined,
+              backgroundColor: "#060D1F",
+              // iOS 13+ has momentum scrolling on by default for overflow:auto.
+              // The legacy `-webkit-overflow-scrolling: touch` is not only
+              // unnecessary now — it can freeze momentum on iOS 13+. Removed.
+              overflow: isMessagesPage ? "hidden" : "auto",
+              height: isMessagesPage ? "calc(100dvh - 60px)" : "auto",
+            }}
+          >
+            {children}
+          </main>
+        </div>
+        {/* Global pull-to-refresh — page-level useRegisterRefresh overrides
+            the default location.reload() fallback for a smoother UX. Skip on
+            /messages where main is not scrollable and pulls would be weird. */}
+        {!isMessagesPage && <GlobalPullToRefresh />}
       </div>
-    </div>
+    </RefreshProvider>
   );
+}
+
+function GlobalPullToRefresh() {
+  const trigger = useGlobalRefresh();
+  const { indicator } = usePullToRefresh(trigger);
+  return <>{indicator}</>;
 }
