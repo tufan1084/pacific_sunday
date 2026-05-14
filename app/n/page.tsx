@@ -7,6 +7,7 @@ import Script from "next/script";
 import { api } from "@/app/services/api";
 import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/app/context/ToastContext";
+import { collectUaHints } from "@/app/utils/uaHints";
 import { getData } from "country-list";
 
 interface BagInfo {
@@ -121,7 +122,12 @@ export default function NFCEntryPage({
 
     async function checkBag() {
       try {
-        const res = await api.bag.check(iykRef!);
+        // Best-effort UA-CH lookup before the scan — gives the backend the
+        // real model (e.g. "SM-S901B") when Chromium has stripped the UA
+        // string to "Android 10; K". Browsers without userAgentData return
+        // null and the backend falls back to UA parsing.
+        const hints = await collectUaHints();
+        const res = await api.bag.check(iykRef!, hints);
         if (cancelled) return;
 
         if (!res.success) {

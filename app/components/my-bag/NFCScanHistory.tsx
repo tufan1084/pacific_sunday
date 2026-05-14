@@ -8,6 +8,8 @@ export default function NFCScanHistory({ bagsData }: NFCScanHistoryProps) {
   const firstBag = bagsData?.bags?.[0];
   const scans = firstBag?.scans || [];
 
+  // Backend already returns scans ordered by scanTime DESC (latest first) —
+  // see profileController.js. No client-side reversal needed.
   const scanHistory = scans.map((scan: any) => {
     const scanDate = new Date(scan.scanTime);
 
@@ -23,7 +25,7 @@ export default function NFCScanHistory({ bagsData }: NFCScanHistoryProps) {
       // recorded before the column existed will have null here.
       device: scan.deviceLabel || 'Unknown device',
     };
-  }).reverse(); // Show most recent first
+  });
 
   return (
     <div style={{ backgroundColor: "#13192A", borderRadius: "5px", fontFamily: "var(--font-poppins), sans-serif", fontWeight: 400, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -43,7 +45,7 @@ export default function NFCScanHistory({ bagsData }: NFCScanHistoryProps) {
         // Anything beyond is reachable by scrolling within the panel — keeps
         // the my-bag layout from stretching off-screen when a user has dozens
         // of scans.
-        <div style={{ overflowY: "auto", overflowX: "hidden", maxHeight: "280px", scrollbarWidth: "thin", scrollbarColor: "#999486 #313131" }}>
+        <div style={{ overflowY: "auto", overflowX: "hidden", maxHeight: "280px", scrollbarWidth: "thin", scrollbarColor: "#999486 #313131", WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehavior: "contain" }}>
           {scanHistory.map((scan: { date: string; device: string }, i: number) => (
             <div key={i}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between" style={{ minHeight: "56px", paddingTop: "clamp(12px, 2vw, 16px)", paddingBottom: "clamp(12px, 2vw, 16px)", paddingLeft: "clamp(16px, 3vw, 24px)", paddingRight: "clamp(16px, 3vw, 24px)", gap: "clamp(4px, 1vw, 12px)", boxSizing: "border-box" }}>

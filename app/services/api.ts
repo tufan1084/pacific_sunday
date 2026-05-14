@@ -71,9 +71,19 @@ export const api = {
   },
 
   bag: {
-    check: (iykRef: string) => {
+    // hints (UA-CH high-entropy values) are optional — included when the
+    // browser can provide them so the backend can record "SM-S901B" instead
+    // of "K" in the scan history.
+    check: (
+      iykRef: string,
+      hints?: { model: string | null; platform: string | null; platformVersion: string | null } | null,
+    ) => {
       const params = new URLSearchParams({ iykRef });
-      return fetchApi<BagCheckResponse>(`/bag?${params.toString()}`);
+      const headers: Record<string, string> = {};
+      if (hints?.model) headers["X-Device-Model"] = hints.model;
+      if (hints?.platform) headers["X-Device-Platform"] = hints.platform;
+      if (hints?.platformVersion) headers["X-Device-Platform-Version"] = hints.platformVersion;
+      return fetchApi<BagCheckResponse>(`/bag?${params.toString()}`, { headers });
     },
   },
 

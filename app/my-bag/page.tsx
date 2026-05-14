@@ -6,6 +6,7 @@ import BagDetails from "@/app/components/my-bag/BagDetails";
 import NFCScanHistory from "@/app/components/my-bag/NFCScanHistory";
 import { Skeleton, SkeletonList, shimmerCss } from "@/app/components/ui/Skeleton";
 import { usePageData } from "@/app/hooks/usePageData";
+import { usePullToRefresh } from "@/app/hooks/usePullToRefresh";
 import { CACHE_TTL } from "@/app/services/cache";
 
 function BagSkeleton() {
@@ -37,7 +38,7 @@ function BagSkeleton() {
 }
 
 export default function MyBagPage() {
-  const { data: bagsData, loading } = usePageData(
+  const { data: bagsData, loading, refresh } = usePageData(
     "mybag:page",
     async () => {
       const res = await api.profile.getBags();
@@ -46,8 +47,11 @@ export default function MyBagPage() {
     CACHE_TTL.MEDIUM,
   );
 
+  const { indicator } = usePullToRefresh(refresh);
+
   return (
     <>
+      {indicator}
       <style>{shimmerCss}</style>
       <div style={{ fontFamily: "var(--font-poppins), sans-serif", marginBottom: "clamp(16px,3vw,20px)" }}>
         <span style={{ color: "#E8C96A", fontSize: "clamp(18px,2.5vw,25px)", fontWeight: 400 }}>My Bag</span>
