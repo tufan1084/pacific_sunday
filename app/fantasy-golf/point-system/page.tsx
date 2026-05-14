@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/app/services/api";
 import { useToast } from "@/app/context/ToastContext";
+import { useConfirm } from "@/app/context/ConfirmContext";
 import GolfLoader from "@/app/components/ui/GolfLoader";
 
 interface PointsRange {
@@ -17,6 +18,7 @@ interface PointsRange {
 
 export default function PointSystemPage() {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [ranges, setRanges] = useState<PointsRange[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -120,8 +122,16 @@ export default function PointSystemPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this points range?")) return;
-    
+    const ok = await confirm({
+      title: "Delete points range?",
+      message: "This range will be removed from the scoring rules. Any tournaments already scored with it keep their results — only future scoring is affected.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      confirmColor: "#EF4444",
+    });
+    if (!ok) return;
+
+
     try {
       const res = await api.points.deleteRange(id);
       if (res.success) {

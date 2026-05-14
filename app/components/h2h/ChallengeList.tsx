@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api } from "@/app/services/api";
 import type { ApiH2HChallenge } from "@/app/services/api";
 import { useToast } from "@/app/context/ToastContext";
+import { useConfirm } from "@/app/context/ConfirmContext";
 
 type Variant = "active" | "past" | "outgoing";
 
@@ -82,9 +83,17 @@ export default function ChallengeList({ title, icon, challenges, viewerId, varia
   const router = useRouter();
   const [busyId, setBusyId] = useState<number | null>(null);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const cancel = async (id: number) => {
-    if (!confirm("Cancel this challenge? Your held points will be released.")) return;
+    const ok = await confirm({
+      title: "Cancel challenge?",
+      message: "Your held points will be released back to your available balance.",
+      confirmText: "Cancel challenge",
+      cancelText: "Keep it",
+      confirmColor: "#EF4444",
+    });
+    if (!ok) return;
     setBusyId(id);
     try {
       const res = await api.h2h.cancel(id);
@@ -183,7 +192,7 @@ export default function ChallengeList({ title, icon, challenges, viewerId, varia
                             cursor: busyId === c.id ? "not-allowed" : "pointer", fontFamily: "inherit",
                           }}
                         >
-                          {busyId === c.id ? "…" : "Cancel"}
+                          {busyId === c.id ? "Cancelling..." : "Cancel"}
                         </button>
                       </td>
                     </tr>
@@ -257,7 +266,7 @@ export default function ChallengeList({ title, icon, challenges, viewerId, varia
                       cursor: busyId === c.id ? "not-allowed" : "pointer", fontFamily: "inherit",
                     }}
                   >
-                    {busyId === c.id ? "…" : "Cancel Challenge"}
+                    {busyId === c.id ? "Cancelling..." : "Cancel Challenge"}
                   </button>
                 </div>
               );

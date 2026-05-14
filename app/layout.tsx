@@ -8,6 +8,7 @@ import ServiceWorkerRegistrar from "@/app/components/ui/ServiceWorkerRegistrar";
 import InstallPrompt from "@/app/components/ui/InstallPrompt";
 import { AuthProvider } from "@/app/context/AuthContext";
 import { ToastProvider } from "@/app/context/ToastContext";
+import { ConfirmProvider } from "@/app/context/ConfirmContext";
 import { NotificationProvider } from "@/app/context/NotificationContext";
 
 const inter = Inter({
@@ -54,11 +55,13 @@ export default function RootLayout({
       <body className="h-full antialiased" style={{ fontFamily: "var(--font-poppins), sans-serif" }}>
         <AuthProvider>
           <ToastProvider>
-            <NotificationProvider>
-              <ServiceWorkerRegistrar />
-              <InstallPrompt />
-              <LayoutContent>{children}</LayoutContent>
-            </NotificationProvider>
+            <ConfirmProvider>
+              <NotificationProvider>
+                <ServiceWorkerRegistrar />
+                <InstallPrompt />
+                <LayoutContent>{children}</LayoutContent>
+              </NotificationProvider>
+            </ConfirmProvider>
           </ToastProvider>
         </AuthProvider>
       </body>

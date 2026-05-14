@@ -33,11 +33,14 @@ const isChallengeClosed = (challenge: ApiH2HChallenge) => {
 };
 
 export default function IncomingRequests({ challenges, onAction }: Props) {
-  const [busyId, setBusyId] = useState<number | null>(null);
+  // Track which row AND which action is in flight, so a click on Decline only
+  // changes the Decline label and leaves Accept showing its default text.
+  // Otherwise both buttons collapsed to the same busy indicator.
+  const [busy, setBusy] = useState<{ id: number; action: "accept" | "decline" } | null>(null);
   const toast = useToast();
 
   const respond = async (id: number, action: "accept" | "decline") => {
-    setBusyId(id);
+    setBusy({ id, action });
     try {
       const res = action === "accept" ? await api.h2h.accept(id) : await api.h2h.decline(id);
       if (!res.success) throw new Error(res.message || `${action} failed`);
@@ -47,7 +50,7 @@ export default function IncomingRequests({ challenges, onAction }: Props) {
       toast.error(e instanceof Error ? e.message : `Failed to ${action} challenge`);
       if (action === "accept") onAction();
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
   };
 
@@ -122,30 +125,34 @@ export default function IncomingRequests({ challenges, onAction }: Props) {
                   <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                     <button
                       onClick={() => respond(c.id, "accept")}
-                      disabled={busyId === c.id || acceptClosed}
+                      disabled={busy?.id === c.id || acceptClosed}
                       title={acceptClosed ? "This challenge can no longer be accepted because the tournament is live." : undefined}
                       style={{
                         padding: "5px 12px", border: "none", borderRadius: 4,
                         background: acceptClosed ? "rgba(255,255,255,0.12)" : "#E8C96A",
                         color: acceptClosed ? "rgba(255,255,255,0.45)" : "#060D1F",
                         fontWeight: 600, fontSize: 11,
-                        cursor: busyId === c.id || acceptClosed ? "not-allowed" : "pointer",
+                        cursor: busy?.id === c.id || acceptClosed ? "not-allowed" : "pointer",
                         fontFamily: "inherit",
                       }}
                     >
-                      {acceptClosed ? "Closed" : busyId === c.id ? "…" : "Accept"}
+                      {acceptClosed
+                        ? "Closed"
+                        : busy?.id === c.id && busy.action === "accept"
+                        ? "Accepting..."
+                        : "Accept"}
                     </button>
                     <button
                       onClick={() => respond(c.id, "decline")}
-                      disabled={busyId === c.id}
+                      disabled={busy?.id === c.id}
                       style={{
                         padding: "5px 12px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4,
                         background: "transparent", color: "#fff", fontWeight: 500, fontSize: 11,
-                        cursor: busyId === c.id ? "not-allowed" : "pointer",
+                        cursor: busy?.id === c.id ? "not-allowed" : "pointer",
                         fontFamily: "inherit",
                       }}
                     >
-                      Decline
+                      {busy?.id === c.id && busy.action === "decline" ? "Declining..." : "Decline"}
                     </button>
                   </div>
                 </td>
@@ -223,7 +230,7 @@ export default function IncomingRequests({ challenges, onAction }: Props) {
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => respond(c.id, "accept")}
-                disabled={busyId === c.id || acceptClosed}
+                disabled={busy?.id === c.id || acceptClosed}
                 title={acceptClosed ? "This challenge can no longer be accepted because the tournament is live." : undefined}
                 style={{
                   flex: 1,
@@ -231,24 +238,28 @@ export default function IncomingRequests({ challenges, onAction }: Props) {
                   background: acceptClosed ? "rgba(255,255,255,0.12)" : "#E8C96A",
                   color: acceptClosed ? "rgba(255,255,255,0.45)" : "#060D1F",
                   fontWeight: 600, fontSize: 13,
-                  cursor: busyId === c.id || acceptClosed ? "not-allowed" : "pointer",
+                  cursor: busy?.id === c.id || acceptClosed ? "not-allowed" : "pointer",
                   fontFamily: "inherit",
                 }}
               >
-                {acceptClosed ? "Closed" : busyId === c.id ? "…" : "Accept"}
+                {acceptClosed
+                  ? "Closed"
+                  : busy?.id === c.id && busy.action === "accept"
+                  ? "Accepting..."
+                  : "Accept"}
               </button>
               <button
                 onClick={() => respond(c.id, "decline")}
-                disabled={busyId === c.id}
+                disabled={busy?.id === c.id}
                 style={{
                   flex: 1,
                   padding: "10px 16px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 5,
                   background: "transparent", color: "#fff", fontWeight: 500, fontSize: 13,
-                  cursor: busyId === c.id ? "not-allowed" : "pointer",
+                  cursor: busy?.id === c.id ? "not-allowed" : "pointer",
                   fontFamily: "inherit",
                 }}
               >
-                Decline
+                {busy?.id === c.id && busy.action === "decline" ? "Declining..." : "Decline"}
               </button>
             </div>
           </div>

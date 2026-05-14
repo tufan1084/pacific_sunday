@@ -8,6 +8,7 @@ import { AiFillHeart } from "react-icons/ai";
 import { BsChatDots } from "react-icons/bs";
 import { api, ApiFollowRequest } from "@/app/services/api";
 import { useToast } from "@/app/context/ToastContext";
+import { useConfirm } from "@/app/context/ConfirmContext";
 import { useAuth } from "@/app/context/AuthContext";
 import { resolveMediaUrl } from "@/app/lib/constants";
 import GolfLoader from "@/app/components/ui/GolfLoader";
@@ -44,6 +45,7 @@ interface FollowUser {
 export default function CommunityProfilePage() {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const { user, refreshUser } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>("posts");
@@ -377,7 +379,14 @@ export default function CommunityProfilePage() {
   };
 
   const handleRemoveFollower = async (userId: number) => {
-    if (!confirm("Remove this follower?")) return;
+    const ok = await confirm({
+      title: "Remove follower?",
+      message: "They will no longer see your posts in their feed. You can re-approve them later if they re-follow you.",
+      confirmText: "Remove",
+      cancelText: "Cancel",
+      confirmColor: "#EF4444",
+    });
+    if (!ok) return;
     try {
       const res = await api.follows.removeFollower(userId);
       if (res.success) {

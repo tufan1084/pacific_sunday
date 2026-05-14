@@ -6,6 +6,7 @@ import { resolveMediaUrl } from "@/app/lib/constants";
 import EditableInput, { type EditableInputHandle } from "../ui/EditableInput";
 import { useToast } from "@/app/context/ToastContext";
 import { IoImageOutline, IoClose, IoChevronDown, IoEarthOutline, IoLockClosedOutline, IoPeopleOutline, IoPricetagOutline } from "react-icons/io5";
+import GifPicker from "@/app/components/ui/GifPicker";
 import type { Team } from "@/app/types/community";
 import type { TagOption } from "@/app/lib/community-data";
 
@@ -47,6 +48,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated, active
   const [loading, setLoading] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
   const [showMediaSheet, setShowMediaSheet] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<EditableInputHandle>(null);
@@ -590,6 +592,33 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated, active
               >
                 <IoImageOutline size={20} />
               </button>
+              <button
+                onClick={() => setShowGifPicker(true)}
+                disabled={loading || mediaFiles.length >= 5}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(232,201,106,0.4)",
+                  color: "#E8C96A",
+                  padding: "3px 8px",
+                  borderRadius: "6px",
+                  cursor: loading || mediaFiles.length >= 5 ? "not-allowed" : "pointer",
+                  opacity: loading || mediaFiles.length >= 5 ? 0.5 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  letterSpacing: "0.04em",
+                  height: "28px",
+                  fontFamily: "inherit",
+                  transition: "background-color 0.2s ease",
+                }}
+                onMouseEnter={(e) => !loading && mediaFiles.length < 5 && (e.currentTarget.style.backgroundColor = "rgba(232,201,106,0.1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                aria-label="Add GIF"
+              >
+                GIF
+              </button>
             </div>
 
             {/* Media source sheet */}
@@ -653,6 +682,17 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated, active
           </button>
         </div>
       </div>
+
+      <GifPicker
+        isOpen={showGifPicker}
+        onClose={() => setShowGifPicker(false)}
+        onSelect={({ file }) => {
+          // GIF goes straight into the existing media pipeline. Skip
+          // normalizeImageFile so the animation is preserved (the helper
+          // only matters for files without an extension).
+          addFiles([file]);
+        }}
+      />
     </div>
   );
 }

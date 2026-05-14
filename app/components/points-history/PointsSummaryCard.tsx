@@ -3,6 +3,11 @@ interface PointsSummaryCardProps {
     currentBalance: number;
     totalEarned: number;
     totalSpent: number;
+    // Points reserved against open H2H challenges. Not deducted from the
+    // wallet — restored when the challenge resolves (win/cancel) or moved to
+    // the opponent if the user loses. Optional for backwards compatibility
+    // with older API responses that didn't include it.
+    heldBalance?: number;
   };
 }
 
@@ -95,6 +100,20 @@ export default function PointsSummaryCard({ summary }: PointsSummaryCardProps) {
             {summary.currentBalance.toLocaleString()}
             <span style={{ fontSize: "0.45em", fontWeight: 400, marginLeft: "4px", opacity: 0.7 }}>pts</span>
           </div>
+          {summary.heldBalance && summary.heldBalance > 0 ? (
+            <div
+              style={{
+                color: "rgba(232,201,106,0.75)",
+                fontSize: "clamp(10px, 2.2vw, 11px)",
+                fontWeight: 500,
+                marginTop: "4px",
+                lineHeight: 1.2,
+              }}
+              title="Reserved against your open H2H challenges. Returned if you win or cancel."
+            >
+              {summary.heldBalance.toLocaleString()} pts on hold
+            </div>
+          ) : null}
         </div>
 
         <div style={{ width: "1px", background: "linear-gradient(180deg, transparent, rgba(255,255,255,0.12), transparent)", alignSelf: "stretch" }} />

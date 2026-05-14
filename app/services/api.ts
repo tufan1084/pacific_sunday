@@ -87,6 +87,23 @@ export const api = {
     },
   },
 
+  // Tenor GIF picker — proxied through the backend so the API key isn't
+  // exposed on the client. `pos` is the cursor Tenor returns for the next
+  // page; pass it back on subsequent calls to paginate.
+  gifs: {
+    search: (q: string, pos?: string | null) => {
+      const params = new URLSearchParams({ q });
+      if (pos) params.set("pos", pos);
+      return fetchApi<{ gifs: GifResult[]; next: string | null }>(`/gif/search?${params.toString()}`);
+    },
+    featured: (pos?: string | null) => {
+      const params = new URLSearchParams();
+      if (pos) params.set("pos", pos);
+      const qs = params.toString();
+      return fetchApi<{ gifs: GifResult[]; next: string | null }>(`/gif/featured${qs ? `?${qs}` : ""}`);
+    },
+  },
+
   auth: {
     register: (body: { name: string; email: string; mpin: string; bagUid: string; country?: string; deviceFingerprint?: string | null }) =>
       fetchApi("/auth/register", { method: "POST", body: JSON.stringify(body) }),
@@ -1088,6 +1105,19 @@ export interface ApiDashboardOverview {
     wind: string;
     playingCondition: string;
   } | null;
+}
+
+// ─── Tenor GIF picker types ─────────────────────────────────────────────────
+
+export interface GifResult {
+  id: string;
+  // Full-quality animated GIF URL. Hand to the upload pipeline.
+  url: string;
+  // Smaller-dimension URL for the picker grid thumbnails.
+  preview: string;
+  width: number | null;
+  height: number | null;
+  title: string;
 }
 
 // ─── NFC-gated login + device verification ──────────────────────────────────

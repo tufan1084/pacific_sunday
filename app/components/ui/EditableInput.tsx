@@ -132,10 +132,35 @@ const EditableInput = forwardRef<EditableInputHandle, EditableInputProps>(functi
   }, []);
 
   const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-    let text = e.currentTarget.textContent || "";
+    const el = e.currentTarget;
+
+    // Check if the keyboard GIF picker injected an <img> into the div.
+    // Mobile keyboards insert GIFs as <img src="blob:..."> directly into
+    // the contentEditable DOM — this happens before textContent is read.
+    const imgs = el.querySelectorAll("img");
+    if (imgs.length > 0) {
+      imgs.forEach(async (img) => {
+        const src = img.src;
+        img.remove(); // remove from DOM immediately
+        if (!src) return;
+        try {
+          const res = await fetch(src);
+          const blob = await res.blob();
+          const ext = blob.type === "image/gif" ? ".gif" : blob.type === "image/png" ? ".png" : ".jpg";
+          const file = new File([blob], `keyboard-media${ext}`, { type: blob.type });
+          if (blob.type === "image/gif" && onGifInsertRef.current) {
+            onGifInsertRef.current(file);
+          } else if (onImagePasteRef.current) {
+            onImagePasteRef.current(file);
+          }
+        } catch { /* ignore fetch errors */ }
+      });
+    }
+
+    let text = el.textContent || "";
     if (maxLength && text.length > maxLength) {
       text = text.slice(0, maxLength);
-      e.currentTarget.textContent = text;
+      el.textContent = text;
       const sel = window.getSelection();
       if (sel && elRef.current) {
         const range = document.createRange();
