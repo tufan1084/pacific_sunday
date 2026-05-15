@@ -18,6 +18,17 @@ export const initializeSocket = (userId: number) => {
     socket?.emit("chat:online", { userId });
   });
 
+  // Global auto-ACK: the moment any new_message lands on this socket, tell the
+  // server it was delivered. This is the trigger that flips the sender's tick
+  // from single grey (SENT) to double grey (DELIVERED). It must be on the
+  // socket itself (not in a component) so it fires regardless of which page
+  // the user is on, including the chat-icon dropdown.
+  socket.on("new_message", (message: any) => {
+    if (message?.id && message?.senderId !== userId) {
+      socket?.emit("chat:message_received", { messageId: message.id });
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("Socket disconnected");
   });
@@ -69,38 +80,80 @@ export const onMessageReaction = (callback: (data: any) => void) => {
   socket?.on("message_reaction", callback);
 };
 
+export const onMessageEdited = (callback: (data: any) => void) => {
+  socket?.on("message_edited", callback);
+};
+
 export const onMessagesRead = (callback: (data: any) => void) => {
   socket?.on("messages_read", callback);
+};
+
+// Sender-side: recipient's delivery state changed for one message.
+// Payload: { messageId, conversationId, userId, status: 'delivered' | 'read' }
+export const onMessageStatus = (callback: (data: any) => void) => {
+  socket?.on("message_status", callback);
+};
+
+// Sender-side: batched version emitted on reconnect-flush and on read receipts.
+// Payload: { messageIds, userId, conversationId?, status: 'delivered' | 'read' }
+export const onMessageStatusBulk = (callback: (data: any) => void) => {
+  socket?.on("message_status_bulk", callback);
 };
 
 export const onUserOnline = (callback: (data: { userId: number; isOnline: boolean }) => void) => {
   socket?.on("user:online", callback);
 };
 
+// New presence event — includes lastSeenAt so the UI can show "last seen 2m ago".
+export const onUserPresence = (
+  callback: (data: { userId: number; isOnline: boolean; lastSeenAt: string | null }) => void
+) => {
+  socket?.on("user:presence", callback);
+};
+
 export const onTyping = (callback: (data: { conversationId: number; userId: number; isTyping: boolean }) => void) => {
   socket?.on("chat:typing", callback);
 };
 
-export const offNewMessage = () => {
-  socket?.off("new_message");
+// All off* helpers accept an optional callback so component cleanup removes
+// only its own listener — this prevents components from accidentally wiping
+// the global auto-ACK handler registered inside initializeSocket().
+export const offNewMessage = (cb?: (message: any) => void) => {
+  cb ? socket?.off("new_message", cb) : socket?.off("new_message");
 };
 
-export const offMessageDeleted = () => {
-  socket?.off("message_deleted");
+export const offMessageDeleted = (cb?: (data: any) => void) => {
+  cb ? socket?.off("message_deleted", cb) : socket?.off("message_deleted");
 };
 
-export const offMessageReaction = () => {
-  socket?.off("message_reaction");
+export const offMessageReaction = (cb?: (data: any) => void) => {
+  cb ? socket?.off("message_reaction", cb) : socket?.off("message_reaction");
 };
 
-export const offMessagesRead = () => {
-  socket?.off("messages_read");
+export const offMessageEdited = (cb?: (data: any) => void) => {
+  cb ? socket?.off("message_edited", cb) : socket?.off("message_edited");
 };
 
-export const offUserOnline = () => {
-  socket?.off("user:online");
+export const offMessagesRead = (cb?: (data: any) => void) => {
+  cb ? socket?.off("messages_read", cb) : socket?.off("messages_read");
 };
 
-export const offTyping = () => {
-  socket?.off("chat:typing");
+export const offMessageStatus = (cb?: (data: any) => void) => {
+  cb ? socket?.off("message_status", cb) : socket?.off("message_status");
+};
+
+export const offMessageStatusBulk = (cb?: (data: any) => void) => {
+  cb ? socket?.off("message_status_bulk", cb) : socket?.off("message_status_bulk");
+};
+
+export const offUserOnline = (cb?: (data: any) => void) => {
+  cb ? socket?.off("user:online", cb) : socket?.off("user:online");
+};
+
+export const offUserPresence = (cb?: (data: any) => void) => {
+  cb ? socket?.off("user:presence", cb) : socket?.off("user:presence");
+};
+
+export const offTyping = (cb?: (data: any) => void) => {
+  cb ? socket?.off("chat:typing", cb) : socket?.off("chat:typing");
 };

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <g fill="none" stroke="#E8C96A" stroke-opacity="0.07" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- golf flag on a mound -->
+    <path d="M40 70 L40 30 L66 40 L40 50"/>
+    <path d="M22 78 Q40 66 58 78"/>
+    <circle cx="40" cy="70" r="1.5" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+
+    <!-- chat bubble -->
+    <path d="M120 36 h44 a8 8 0 0 1 8 8 v22 a8 8 0 0 1 -8 8 h-30 l-12 12 v-12 h-2 a8 8 0 0 1 -8 -8 v-22 a8 8 0 0 1 8 -8 z"/>
+
+    <!-- golf ball with dimples -->
+    <circle cx="240" cy="52" r="18"/>
+    <circle cx="234" cy="48" r="1.4" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+    <circle cx="244" cy="46" r="1.4" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+    <circle cx="240" cy="56" r="1.4" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+    <circle cx="248" cy="56" r="1.4" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+
+    <!-- sun (Pacific Sunday) -->
+    <circle cx="290" cy="120" r="12"/>
+    <path d="M290 100 v-8 M290 140 v8 M270 120 h-8 M310 120 h8 M276 106 l-6 -6 M304 106 l6 -6 M276 134 l-6 6 M304 134 l6 6"/>
+
+    <!-- heart -->
+    <path d="M60 140 c-6 -10 -22 -6 -22 6 c0 10 22 22 22 22 c0 0 22 -12 22 -22 c0 -12 -16 -16 -22 -6 z"/>
+
+    <!-- trophy -->
+    <path d="M150 120 h28 v10 a14 14 0 0 1 -28 0 z"/>
+    <path d="M150 124 h-10 a8 8 0 0 0 10 8 M178 124 h10 a8 8 0 0 1 -10 8"/>
+    <path d="M160 144 v8 h8 v-8 M154 156 h20"/>
+
+    <!-- star -->
+    <path d="M232 150 l5 11 12 1 -9 8 3 12 -11 -6 -11 6 3 -12 -9 -8 12 -1 z"/>
+
+    <!-- golf club (driver) -->
+    <path d="M30 210 l46 -46"/>
+    <path d="M70 156 q14 -6 18 8 q-12 10 -22 2 z"/>
+
+    <!-- location pin -->
+    <path d="M120 200 c0 -14 22 -14 22 0 c0 11 -11 22 -11 22 c0 0 -11 -11 -11 -22 z"/>
+    <circle cx="131" cy="200" r="4"/>
+
+    <!-- golf tee -->
+    <path d="M210 200 h14 l-4 8 h-6 z M217 208 v16"/>
+
+    <!-- medal -->
+    <path d="M286 196 l-8 14 M298 196 l8 14"/>
+    <circle cx="292" cy="226" r="14"/>
+    <path d="M292 220 l2.5 5 5.5 .6 -4 4 1 5.5 -5 -2.8 -5 2.8 1 -5.5 -4 -4 5.5 -.6 z"/>
+
+    <!-- second chat bubble -->
+    <path d="M40 270 h40 a8 8 0 0 1 8 8 v18 a8 8 0 0 1 -8 8 h-26 l-12 12 v-12 h-2 a8 8 0 0 1 -8 -8 v-18 a8 8 0 0 1 8 -8 z"/>
+
+    <!-- flag #2 -->
+    <path d="M150 300 v-34 l22 8 -22 8"/>
+    <path d="M134 308 q16 -10 32 0"/>
+
+    <!-- golf ball #2 small -->
+    <circle cx="232" cy="284" r="14"/>
+    <circle cx="228" cy="281" r="1.2" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+    <circle cx="236" cy="281" r="1.2" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+    <circle cx="232" cy="288" r="1.2" fill="#E8C96A" fill-opacity="0.06" stroke="none"/>
+
+    <!-- sparkle -->
+    <path d="M292 286 v10 M292 300 v8 M286 296 h-8 M298 296 h8"/>
+  </g>
+</svg>

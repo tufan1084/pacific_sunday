@@ -19,6 +19,26 @@ export default function MessagesContent() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Lock the document so no browser (Firefox especially — it auto-scrolls
+  // focused buttons into view following the spec strictly, Chrome silently
+  // skips this) can scroll body/html while the chat page is mounted. Without
+  // this, clicking a conversation row in Firefox scrolls the sidebar nav and
+  // the chat header off the top of the viewport. We snapshot whatever
+  // overflow value was there and restore it on unmount so other pages aren't
+  // affected.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, []);
+
   useEffect(() => {
     const convId = searchParams.get("conversation");
     if (convId) {
@@ -43,19 +63,27 @@ export default function MessagesContent() {
 
   return (
     <div
-      className="flex"
+      className="flex min-h-0"
       style={{
         fontFamily: "var(--font-poppins), sans-serif",
         backgroundColor: "#01050D",
         height: "100%",
-        maxHeight: "calc(100dvh - 60px)",
         overflow: "hidden"
       }}
     >
       {showList && (
         <div
-          className={`${isMobile ? "w-full" : "w-96"} border-r flex-shrink-0 flex flex-col`}
-          style={{ borderColor: "rgba(232, 201, 106, 0.15)", backgroundColor: "#0B1120", height: "100%" }}
+          className={`${isMobile ? "w-full" : "w-96"} border-r flex-shrink-0 flex flex-col min-h-0`}
+          style={{
+            borderColor: "rgba(232, 201, 106, 0.15)",
+            backgroundColor: "#0B1120",
+            // Tiled WhatsApp-style doodle. The dark base colour shows through
+            // the transparent SVG; the gold strokes are already baked at very
+            // low opacity so the texture stays subtle.
+            backgroundImage: "url('/data/chat-doodle.svg')",
+            backgroundRepeat: "repeat",
+            backgroundSize: "320px 320px",
+          }}
         >
           <ConversationList
             selectedId={selectedConversationId}
@@ -65,7 +93,11 @@ export default function MessagesContent() {
       )}
 
       {showThread && (
-        <div className="flex-1 flex flex-col" style={{ backgroundColor: "#01050D", height: "100%", maxHeight: "100%", overflow: "hidden" }}>
+        <div className="flex-1 flex flex-col min-h-0" style={{ backgroundColor: "#01050D", overflow: "hidden",
+          backgroundImage: "url('/data/chat-doodle.svg')",
+          backgroundRepeat: "repeat",
+          backgroundSize: "320px 320px",
+        }}>
           {selectedConversationId ? (
             <ChatThread
               conversationId={selectedConversationId}

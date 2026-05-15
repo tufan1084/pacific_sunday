@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeftIcon, MenuIcon } from "@/app/components/ui/Icons";
 import NotificationsDropdown from "@/app/components/layout/NotificationsDropdown";
 import ProfileDropdown from "@/app/components/layout/ProfileDropdown";
+import ChatDropdown from "@/app/components/layout/ChatDropdown";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -87,6 +88,7 @@ export default function Header({ onMenuToggle, showBack = false }: HeaderProps) 
           className="flex items-center flex-shrink-0"
           style={{ gap: "clamp(8px, 1.5vw, 20px)" }}
         >
+          <ChatDropdown />
           <NotificationsDropdown />
           <ProfileDropdown />
         </div>

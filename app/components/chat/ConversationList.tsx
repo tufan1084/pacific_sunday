@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { SearchIcon, ChatIcon } from "@/app/components/ui/Icons";
-import { onUserOnline, onTyping, offUserOnline, offTyping } from "@/app/services/socket";
+import { onUserPresence, onTyping, offUserPresence, offTyping, onNewMessage, offNewMessage } from "@/app/services/socket";
 import NewChatModal from "./NewChatModal";
 
 interface Conversation {
@@ -13,6 +13,7 @@ interface Conversation {
     name: string;
     photoUrl: string | null;
     isOnline: boolean;
+    lastSeenAt: string | null;
     isTyping: boolean;
   };
   lastMessage: {
@@ -41,20 +42,26 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
 
   useEffect(() => {
     fetchConversations();
-    
-    // Listen for online status updates
-    onUserOnline((data) => {
+
+    // Live presence — keeps the green dot + last-seen fresh without polling.
+    const handlePresence = (data: { userId: number; isOnline: boolean; lastSeenAt: string | null }) => {
       setConversations((prev) =>
         prev.map((conv) =>
           conv.otherUser.id === data.userId
-            ? { ...conv, otherUser: { ...conv.otherUser, isOnline: data.isOnline } }
+            ? {
+                ...conv,
+                otherUser: {
+                  ...conv.otherUser,
+                  isOnline: data.isOnline,
+                  lastSeenAt: data.lastSeenAt,
+                },
+              }
             : conv
         )
       );
-    });
-    
-    // Listen for typing indicators
-    onTyping((data) => {
+    };
+
+    const handleTyping = (data: { conversationId: number; userId: number; isTyping: boolean }) => {
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === data.conversationId
@@ -62,11 +69,47 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
             : conv
         )
       );
-    });
-    
+    };
+
+    // Move the conversation to the top + bump unread/preview when a new message
+    // arrives, so the list reflects activity without re-fetching from the server.
+    const handleNewMessage = (message: any) => {
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === message.conversationId);
+        if (idx === -1) {
+          // Unknown conversation (newly created) — refetch the list.
+          fetchConversations();
+          return prev;
+        }
+        const conv = prev[idx];
+        const isMine = message.senderId === (typeof window !== "undefined"
+          ? parseInt(localStorage.getItem("ps_user_id") || "0")
+          : 0);
+        const updated: Conversation = {
+          ...conv,
+          lastMessage: {
+            content: message.content,
+            messageType: message.messageType,
+            senderId: message.senderId,
+            createdAt: message.createdAt,
+          } as any,
+          unreadCount: isMine ? conv.unreadCount : (conv.unreadCount || 0) + 1,
+          updatedAt: message.createdAt,
+        };
+        const next = prev.filter((_, i) => i !== idx);
+        next.unshift(updated);
+        return next;
+      });
+    };
+
+    onUserPresence(handlePresence);
+    onTyping(handleTyping);
+    onNewMessage(handleNewMessage);
+
     return () => {
-      offUserOnline();
-      offTyping();
+      offUserPresence(handlePresence);
+      offTyping(handleTyping);
+      offNewMessage(handleNewMessage);
     };
   }, []);
 
@@ -256,8 +299,10 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
         </div>
       </div>
 
-      {/* List Content */}
-      <div className="flex-1 overflow-y-auto" style={{ backgroundColor: "#0B1120" }}>
+      {/* List Content — transparent so the panel's doodle background shows
+          through behind the conversation rows (rows are themselves
+          transparent, only borders + hover tint). */}
+      <div className="flex-1 overflow-y-auto">
         {showNewChat ? (
           // New Chat - User Search
           <div>
@@ -283,6 +328,10 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
               searchUsers.map((user) => (
                 <button
                   key={user.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLButtonElement).focus({ preventScroll: true });
+                  }}
                   onClick={() => startConversation(user.id)}
                   className="w-full px-4 py-2.5 flex items-center gap-3 transition-all border-b hover:bg-white/3"
                   style={{ borderColor: "rgba(232, 201, 106, 0.05)" }}
@@ -336,10 +385,19 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
               filteredConversations.map((conv) => (
                 <button
                   key={conv.id}
+                  onMouseDown={(e) => {
+                    // Firefox: clicking a button focuses it, and the browser
+                    // walks up the DOM looking for a scrollable ancestor to
+                    // bring it into view — that's what shifts the sidebar
+                    // and the chat header off-screen. Re-focus with
+                    // preventScroll, then run the click handler.
+                    e.preventDefault();
+                    (e.currentTarget as HTMLButtonElement).focus({ preventScroll: true });
+                  }}
                   onClick={() => onSelect(conv.id, conv.otherUser)}
                   className={`w-full px-4 py-2.5 flex items-center gap-3 transition-all border-b ${
-                    selectedId === conv.id 
-                      ? "bg-gradient-to-r from-[#E8C96A]/8 to-transparent" 
+                    selectedId === conv.id
+                      ? "bg-gradient-to-r from-[#E8C96A]/8 to-transparent"
                       : "hover:bg-white/3"
                   }`}
                   style={{ borderColor: "rgba(232, 201, 106, 0.05)" }}

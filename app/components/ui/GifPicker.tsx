@@ -102,14 +102,13 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
     if (picking) return;
     setPicking(g.id);
     try {
-      // Tenor's gif URLs are CDN-hosted with permissive CORS, so a direct
+      // Giphy's gif URLs are CDN-hosted with permissive CORS, so a direct
       // fetch from the browser works. The blob comes back as image/gif which
       // the post-upload pipeline already accepts.
       const res = await fetch(g.url);
       if (!res.ok) throw new Error("Failed to download GIF");
       const blob = await res.blob();
-      const ext = blob.type === "image/gif" ? "gif" : "gif"; // Tenor always serves gif here
-      const file = new File([blob], `tenor-${g.id}.${ext}`, { type: blob.type || "image/gif" });
+      const file = new File([blob], `giphy-${g.id}.gif`, { type: blob.type || "image/gif" });
       await onSelect({ file, result: g });
       onClose();
     } catch (e) {
@@ -188,7 +187,7 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Tenor..."
+              placeholder="Search GIPHY..."
               // 16px to avoid iOS Safari auto-zooming on focus.
               style={{
                 flex: 1,
@@ -308,7 +307,7 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
           )}
         </div>
 
-        {/* Attribution — Tenor TOS require visible attribution somewhere. */}
+        {/* Attribution — GIPHY TOS require visible attribution. */}
         <div
           style={{
             padding: "8px 18px",
@@ -319,7 +318,7 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
             flexShrink: 0,
           }}
         >
-          Powered by Tenor
+          Powered by GIPHY
         </div>
       </div>
     </div>

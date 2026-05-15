@@ -55,7 +55,6 @@ html {
   overflow-x: hidden;
   scrollbar-color: rgba(255, 255, 255, 0.08) #020617;
   height: 100%;
-  height: 100dvh;
   background-color: #01050D;
   /* iOS Safari: prevent text size adjustment on orientation change */
   -webkit-text-size-adjust: 100%;
@@ -302,7 +301,6 @@ label[for] {
 /* Main content padding — 12px on mobile, 20px on lg+ */
 .main-content {
   padding: 12px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
   /* iOS: keep child scroll from chaining to the document and triggering bounce */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -311,7 +309,6 @@ label[for] {
 @media (min-width: 1024px) {
   .main-content {
     padding: 20px;
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
 }
 
