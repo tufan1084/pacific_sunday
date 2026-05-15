@@ -5,6 +5,7 @@ import { IoMdSend } from "react-icons/io";
 import { IoImageOutline, IoClose } from "react-icons/io5";
 import { FiCamera } from "react-icons/fi";
 import EditableInput from "../ui/EditableInput";
+import GifPicker from "@/app/components/ui/GifPicker";
 
 const MIME_EXT: Record<string, string> = {
   "image/gif": ".gif",
@@ -34,6 +35,7 @@ export default function CommentInput({ onSubmit }: CommentInputProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
+  const [showGif, setShowGif] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +89,7 @@ export default function CommentInput({ onSubmit }: CommentInputProps) {
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="p-3 md:p-4">
       {preview && (
         <div className="mb-2 relative inline-block">
@@ -111,6 +114,15 @@ export default function CommentInput({ onSubmit }: CommentInputProps) {
         {/* Hidden inputs */}
         <input ref={fileRef} type="file" accept="image/*,image/gif" onChange={(e) => { const f = e.target.files?.[0]; if (f) attachFile(f); e.target.value = ""; }} style={{ display: "none" }} />
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { const f = e.target.files?.[0]; if (f) attachFile(f); e.target.value = ""; }} style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none", overflow: "hidden", clip: "rect(0,0,0,0)" }} />
+        <button
+          type="button"
+          onClick={() => setShowGif(true)}
+          disabled={submitting}
+          aria-label="Add GIF"
+          className="h-7 px-2 flex items-center justify-center rounded-md text-[11px] font-bold tracking-wide text-[#E8C96A] border border-[#E8C96A]/40 hover:bg-[#E8C96A]/10 transition-all flex-shrink-0 disabled:opacity-40"
+        >
+          GIF
+        </button>
         <button type="button" onClick={() => setShowSheet(true)} disabled={submitting} className="w-10 h-10 flex items-center justify-center rounded-full text-[#E8C96A] hover:bg-[#E8C96A]/10 transition-all flex-shrink-0 disabled:opacity-40">
           <IoImageOutline size={20} />
         </button>
@@ -161,6 +173,16 @@ export default function CommentInput({ onSubmit }: CommentInputProps) {
         </div>
       )}
     </form>
+
+    {/* Rendered OUTSIDE the <form> on purpose: GifPicker's internal buttons
+        have no type attribute, so inside a form they'd act as submit buttons
+        and fire the comment off when you tap a GIF / close. */}
+    <GifPicker
+      isOpen={showGif}
+      onClose={() => setShowGif(false)}
+      onSelect={({ file }) => attachFile(file)}
+    />
+    </>
   );
 }
 

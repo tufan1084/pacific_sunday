@@ -33,10 +33,22 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
   // It is cleared as soon as the modal sends or the user cancels.
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showImagePreview, setShowImagePreview] = useState(false);
+  // WhatsApp-style source chooser: tapping the image icon on mobile asks
+  // "Take Photo" vs "Choose from Gallery" instead of jumping straight to the
+  // gallery (which is why there was no way to use the camera before).
+  const [showSourceSheet, setShowSourceSheet] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+
+  // Camera capture is a mobile affordance (the <input capture> attribute opens
+  // the device camera). On desktop there's no camera, so the icon goes
+  // straight to the file picker — same as WhatsApp Web.
+  const isMobile =
+    typeof window !== "undefined" &&
+    /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   useEffect(() => {
     return () => {
@@ -127,10 +139,20 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
   // caption + send; this component just opens it with the chosen files.
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    // Reset whichever input fired so picking/taking the same image twice in a
+    // row still triggers onChange.
+    e.target.value = "";
     if (files.length === 0) return;
     setSelectedFiles(files.slice(0, MAX_FILES));
     setShowImagePreview(true);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setShowSourceSheet(false);
+  };
+
+  // Image icon tap: on mobile offer Camera vs Gallery (WhatsApp behaviour);
+  // on desktop go straight to the file picker.
+  const handleImageButtonClick = () => {
+    if (isMobile) setShowSourceSheet(true);
+    else fileInputRef.current?.click();
   };
 
   const handleAddMoreImages = (extra: File[]) => {
@@ -214,10 +236,13 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
 
       {/* Input Area — WhatsApp layout: a single rounded pill (emoji + textarea + image)
           with a separate circular send button on the right. */}
-      <div className="flex items-end gap-2">
-        {/* Pill containing emoji, textarea, image */}
+      <div className="flex items-end gap-2 min-w-0">
+        {/* Pill containing emoji, textarea, image. min-w-0 lets the flex
+            pill shrink below its content width on narrow phones — without it
+            the textarea's intrinsic min-width pushes the send button off the
+            edge and the whole row overflows. */}
         <div
-          className="flex-1 flex items-center gap-1 rounded-3xl px-2 py-1"
+          className="flex-1 min-w-0 flex items-center gap-1 rounded-3xl px-2 py-1"
           style={{
             backgroundColor: "#0F1629",
             border: "1px solid rgba(232, 201, 106, 0.15)",
@@ -245,19 +270,22 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="flex-1 px-1 py-1.5 bg-transparent outline-none resize-none"
+            className="flex-1 min-w-0 w-full px-1 py-1.5 bg-transparent outline-none resize-none"
             style={{
               color: "#E8E8E8",
               maxHeight: "100px",
-              fontSize: "14px",
-              lineHeight: "20px",
+              // 16px (not 14) — iOS Safari auto-zooms the whole viewport when
+              // a focused input is < 16px, which is what made the composer
+              // "not fit" on mobile.
+              fontSize: "16px",
+              lineHeight: "22px",
             }}
           />
 
           {/* Image Upload Button (inside pill, right) — opens the WhatsApp-style
               preview modal where the user adds a caption and confirms. */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleImageButtonClick}
             className="p-1.5 rounded-full hover:bg-white/10 transition-all flex-shrink-0"
             style={{ color: "#8B9AAF" }}
             aria-label="Attach image"
@@ -271,6 +299,24 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
             multiple
             onChange={handleFileSelect}
             className="hidden"
+          />
+          {/* Camera capture — `capture` opens the rear camera directly on
+              mobile. Single shot only (capture implies one file). */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileSelect}
+            style={{
+              position: "absolute",
+              width: "1px",
+              height: "1px",
+              opacity: 0,
+              pointerEvents: "none",
+              overflow: "hidden",
+              clip: "rect(0,0,0,0)",
+            }}
           />
         </div>
 
@@ -302,6 +348,71 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
           </svg>
         </button>
       </div>
+
+      {/* Source chooser (mobile) — WhatsApp-style: Camera or Gallery. */}
+      {showSourceSheet && (
+        <div
+          onClick={() => setShowSourceSheet(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10000,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "420px",
+              backgroundColor: "#1A2332",
+              borderRadius: "16px",
+              padding: "8px",
+              border: "1px solid rgba(232, 201, 106, 0.15)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => { setShowSourceSheet(false); cameraInputRef.current?.click(); }}
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl hover:bg-white/5 transition-colors"
+              style={{ background: "none", border: "none", color: "#E8E8E8", fontSize: "15px", cursor: "pointer" }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8C96A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              Take Photo
+            </button>
+            <div style={{ height: "1px", backgroundColor: "rgba(232, 201, 106, 0.08)", margin: "0 16px" }} />
+            <button
+              type="button"
+              onClick={() => { setShowSourceSheet(false); fileInputRef.current?.click(); }}
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl hover:bg-white/5 transition-colors"
+              style={{ background: "none", border: "none", color: "#E8E8E8", fontSize: "15px", cursor: "pointer" }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8C96A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              Choose from Gallery
+            </button>
+            <div style={{ height: "1px", backgroundColor: "rgba(232, 201, 106, 0.08)", margin: "0 16px" }} />
+            <button
+              type="button"
+              onClick={() => setShowSourceSheet(false)}
+              className="w-full px-4 py-3.5 rounded-xl"
+              style={{ background: "none", border: "none", color: "#8B9AAF", fontSize: "15px", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

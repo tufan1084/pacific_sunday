@@ -306,20 +306,6 @@ export default function GifPicker({ isOpen, onClose, onSelect }: GifPickerProps)
             </div>
           )}
         </div>
-
-        {/* Attribution — GIPHY TOS require visible attribution. */}
-        <div
-          style={{
-            padding: "8px 18px",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.35)",
-            fontSize: "10px",
-            textAlign: "center",
-            flexShrink: 0,
-          }}
-        >
-          Powered by GIPHY
-        </div>
       </div>
     </div>
   );

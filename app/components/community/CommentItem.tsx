@@ -5,6 +5,7 @@ import { FiMoreHorizontal, FiEdit2, FiTrash2, FiCamera } from "react-icons/fi";
 import { IoImageOutline } from "react-icons/io5";
 import { resolveMediaUrl } from "@/app/lib/constants";
 import EditableInput from "../ui/EditableInput";
+import GifPicker from "@/app/components/ui/GifPicker";
 
 interface CommentItemProps {
   comment: any;
@@ -79,6 +80,7 @@ export default function CommentItem({
   const fontSize = Math.max(14 - depth * 0.5, 11);
   const [showReplies, setShowReplies] = useState(false);
   const [showMediaSheet, setShowMediaSheet] = useState(false);
+  const [showReplyGif, setShowReplyGif] = useState(false);
   const replyFileInputRef = useRef<HTMLInputElement>(null);
   const replyCameraInputRef = useRef<HTMLInputElement>(null);
   const isMobile = typeof window !== "undefined" && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -240,6 +242,32 @@ export default function CommentItem({
                   )}
                 </div>
                 <button
+                  type="button"
+                  onClick={() => setShowReplyGif(true)}
+                  disabled={submittingComment}
+                  aria-label="Add GIF"
+                  style={{
+                    backgroundColor: "transparent",
+                    color: "#E8C96A",
+                    border: "1px solid rgba(232,201,106,0.4)",
+                    borderRadius: "6px",
+                    height: "28px",
+                    padding: "0 8px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    cursor: submittingComment ? "not-allowed" : "pointer",
+                    opacity: submittingComment ? 0.5 : 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  GIF
+                </button>
+                <button
                   onClick={() => onReplySubmit(comment.id)}
                   disabled={submittingComment || (!replyText.trim() && !replyMedia)}
                   style={{
@@ -280,6 +308,16 @@ export default function CommentItem({
               </div>
             </div>
           )}
+
+          <GifPicker
+            isOpen={showReplyGif}
+            onClose={() => setShowReplyGif(false)}
+            onSelect={({ file }) => {
+              // Reuse the existing reply-media pipeline (same path the
+              // keyboard GIF / paste handlers feed into).
+              (onReplyGifInsert ?? onReplyImagePaste)?.(file);
+            }}
+          />
 
           {/* Reply media sheet */}
           {showMediaSheet && (
