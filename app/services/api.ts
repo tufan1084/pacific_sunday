@@ -159,10 +159,18 @@ export const api = {
         body: JSON.stringify({ email, otp }),
       }),
 
-    resetPassword: (resetToken: string, newPassword: string) =>
+    // The argument is the user's new 4-digit PIN. Sent as `newPin`; the
+    // backend also accepts `newPassword` for backward compatibility.
+    resetPassword: (resetToken: string, newPin: string) =>
       fetchApi("/auth/reset-password", {
         method: "POST",
-        body: JSON.stringify({ resetToken, newPassword }),
+        body: JSON.stringify({ resetToken, newPin }),
+      }),
+
+    changePin: (currentPin: string, newPin: string) =>
+      fetchApi("/auth/change-pin", {
+        method: "POST",
+        body: JSON.stringify({ currentPin, newPin }),
       }),
   },
 

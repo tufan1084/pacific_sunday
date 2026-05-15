@@ -273,6 +273,7 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
               is mounted at the input-bar root above so it can be full-width. */}
           <div className="flex-shrink-0">
             <button
+              type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               className="p-1.5 rounded-full hover:bg-white/10 transition-all"
               style={{ color: showEmojiPicker ? "#E8C96A" : "#8B9AAF" }}
@@ -305,6 +306,7 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
           {/* Image Upload Button (inside pill, right) — opens the WhatsApp-style
               preview modal where the user adds a caption and confirms. */}
           <button
+            type="button"
             onClick={handleImageButtonClick}
             className="p-1.5 rounded-full hover:bg-white/10 transition-all flex-shrink-0"
             style={{ color: "#8B9AAF" }}
@@ -321,28 +323,26 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
             className="hidden"
           />
           {/* Camera capture — `capture` opens the rear camera directly on
-              mobile. Single shot only (capture implies one file). */}
+              mobile. Single shot only (capture implies one file).
+              Must be hidden exactly like the gallery input above
+              (display:none via `hidden`). An absolutely-positioned, opacity-0,
+              pointer-events:none clipped input makes some Android WebViews drop
+              the captured file and cold-reload the page on return — which is
+              why "Take Photo" lost the picture and refreshed the app. */}
           <input
             ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             onChange={handleFileSelect}
-            style={{
-              position: "absolute",
-              width: "1px",
-              height: "1px",
-              opacity: 0,
-              pointerEvents: "none",
-              overflow: "hidden",
-              clip: "rect(0,0,0,0)",
-            }}
+            className="hidden"
           />
         </div>
 
         {/* Send Button (outside pill, circular, gold) — text-only sends.
             Image sends are confirmed inside the preview modal. */}
         <button
+          type="button"
           onClick={handleSend}
           // Don't let the tap move focus off the textarea — that blur is what
           // closed the keyboard after every send. Click still fires.

@@ -113,6 +113,7 @@ export default function ImagePreviewModal({
         }}
       >
         <button
+          type="button"
           onClick={onClose}
           aria-label="Close preview"
           style={{
@@ -169,6 +170,7 @@ export default function ImagePreviewModal({
             return (
               <button
                 key={idx}
+                type="button"
                 onClick={() => setCurrentIdx(idx)}
                 style={{
                   width: "48px",
@@ -196,6 +198,7 @@ export default function ImagePreviewModal({
           {files.length < maxFiles && (
             <>
               <button
+                type="button"
                 onClick={() => addMoreRef.current?.click()}
                 aria-label="Add more images"
                 style={{
@@ -228,21 +231,20 @@ export default function ImagePreviewModal({
         </div>
       )}
 
-      {/* Caption + send row. position:relative so the emoji/GIF picker
-          anchors to this full-width row (and spans the viewport on mobile)
-          instead of the ~20px emoji-button wrapper. */}
+      {/* Bottom region: a block wrapper holding the emoji/GIF picker + the
+          flex caption/send row. */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          padding: "10px 12px 14px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          flexShrink: 0,
-          maxWidth: "600px",
-          width: "100%",
-          margin: "0 auto",
+          // Plain BLOCK (not flex) position:relative wrapper. The emoji/GIF
+          // picker anchors to this, so on mobile it resolves to the full
+          // viewport width. Anchoring it to the flex caption row collapsed
+          // it to a broken vertical strip on the left.
           position: "relative",
+          width: "100%",
+          maxWidth: "600px",
+          margin: "0 auto",
+          flexShrink: 0,
         }}
       >
         <EmojiGifPicker
@@ -255,6 +257,15 @@ export default function ImagePreviewModal({
           onSelectGif={() => {}}
         />
 
+        {/* Caption + send row (flex) */}
+        <div
+          style={{
+            padding: "10px 12px 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
         {/* Caption pill */}
         <div
           style={{
@@ -271,6 +282,7 @@ export default function ImagePreviewModal({
         >
           <div style={{ flexShrink: 0 }}>
             <button
+              type="button"
               onClick={() => setShowEmojiPicker((v) => !v)}
               style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: showEmojiPicker ? "#E8C96A" : "#8B9AAF", padding: 0 }}
               aria-label="Insert emoji"
@@ -306,6 +318,7 @@ export default function ImagePreviewModal({
         {/* Send button with image-count badge */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           <button
+            type="button"
             onClick={handleSend}
             aria-label="Send"
             style={{
@@ -355,6 +368,7 @@ export default function ImagePreviewModal({
               {files.length}
             </span>
           )}
+        </div>
         </div>
       </div>
     </div>
