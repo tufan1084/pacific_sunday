@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { CloseIcon, SendIcon, ImageIcon, EmojiIcon, MoreVerticalIcon, ChatIcon } from "@/app/components/ui/Icons";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
@@ -15,6 +15,7 @@ import {
   onMessageStatus,
   onMessageStatusBulk,
   onUserPresence,
+  onTyping,
   offNewMessage,
   offMessageDeleted,
   offMessageReaction,
@@ -22,8 +23,53 @@ import {
   offMessagesRead,
   offMessageStatus,
   offMessageStatusBulk,
-  offUserPresence
+  offUserPresence,
+  offTyping
 } from "@/app/services/socket";
+
+// Per-conversation message cache (session-scoped). Lets a reopened thread
+// paint its last-known messages instantly instead of a "Loading…" screen,
+// the way WhatsApp does. Capped to the most recent slice so sessionStorage
+// can't bloat; optimistic (negative-id) messages are never cached.
+const MSG_CACHE_PREFIX = "chat:messages:";
+const MSG_CACHE_LIMIT = 80;
+const CONV_CACHE_KEY = "chat:conversations";
+
+function getCachedMessages(cid: number): any[] | null {
+  try {
+    const raw = sessionStorage.getItem(MSG_CACHE_PREFIX + cid);
+    const arr = raw ? JSON.parse(raw) : null;
+    return Array.isArray(arr) && arr.length ? arr : null;
+  } catch { return null; }
+}
+
+function setCachedMessages(cid: number, data: any[]) {
+  try {
+    const real = data.filter((m) => m && m.id > 0);
+    if (!real.length) return;
+    sessionStorage.setItem(
+      MSG_CACHE_PREFIX + cid,
+      JSON.stringify(real.slice(-MSG_CACHE_LIMIT))
+    );
+  } catch { /* quota / serialization — non-fatal, just skip caching */ }
+}
+
+// Pull the other participant out of the conversation-list cache so the header
+// (name/avatar/presence) renders instantly on a deep-link/refresh instead of
+// waiting on the /conversations round-trip.
+function getCachedOtherUser(cid: number): any | null {
+  try {
+    const raw = sessionStorage.getItem(CONV_CACHE_KEY);
+    if (!raw) return null;
+    const { data } = JSON.parse(raw);
+    const conv = (data || []).find((c: any) => c.id === cid);
+    return conv?.otherUser ?? null;
+  } catch { return null; }
+}
+
+// Layout effect on the client (runs before paint → no spinner flash),
+// plain effect on the server where layout effects are no-ops.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface Message {
   id: number;
@@ -85,6 +131,11 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
   // one. MessageInput renders a small preview row, send POSTs replyToId,
   // then we clear this back to null.
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  // True while the other participant is typing in this conversation. Drives
+  // the "typing…" line in the header. Auto-clears on a safety timeout in case
+  // the stop event is missed.
+  const [otherTyping, setOtherTyping] = useState(false);
+  const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmAction, setConfirmAction] = useState<'clear' | 'delete' | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -136,6 +187,30 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Hydrate this conversation's thread from cache *before paint*, keyed on the
+  // conversation id so switching chats swaps content with no loading screen
+  // and no flash of the previous chat's messages. The network refresh in the
+  // effect below then reconciles silently.
+  useIsoLayoutEffect(() => {
+    if (!conversationId) return;
+    const uidRaw = typeof window !== "undefined" ? localStorage.getItem("ps_user_id") : null;
+    const uid = currentUserId ?? (uidRaw ? parseInt(uidRaw) : null);
+    const cached = getCachedMessages(conversationId);
+    if (cached) {
+      setMessages(
+        cached.map((msg: any) =>
+          msg.senderId !== uid ? msg : { ...msg, status: deriveStatus(msg) }
+        )
+      );
+      setLoading(false);
+    } else {
+      // No cache for this chat yet — clear the previous chat's messages so
+      // they don't linger, and show the loader until the fetch lands.
+      setMessages([]);
+      setLoading(true);
+    }
+  }, [conversationId, currentUserId]);
+
   useEffect(() => {
     if (!conversationId || !currentUserId) return;
 
@@ -144,7 +219,9 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
     } else {
       fetchConversation();
     }
-    fetchMessages();
+    // Silent (no loader) when we already painted cached messages — the fetch
+    // just reconciles in the background. Loud (loader) only on a cold thread.
+    fetchMessages(!!getCachedMessages(conversationId));
     markAsRead();
 
     joinConversation(conversationId);
@@ -265,6 +342,21 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
       );
     };
 
+    // Typing indicator from the other participant. We ignore our own echo and
+    // anything for a different conversation. A 4s safety timer clears the
+    // state if the matching "stopped typing" event never arrives.
+    const handleTyping = (data: { conversationId: number; userId: number; isTyping: boolean }) => {
+      if (data.conversationId !== conversationId) return;
+      if (data.userId === currentUserId) return;
+      if (typingClearRef.current) clearTimeout(typingClearRef.current);
+      if (data.isTyping) {
+        setOtherTyping(true);
+        typingClearRef.current = setTimeout(() => setOtherTyping(false), 4000);
+      } else {
+        setOtherTyping(false);
+      }
+    };
+
     onNewMessage(handleNewMessage);
     onMessageDeleted(handleDeleted);
     onMessageEdited(handleEdited);
@@ -273,6 +365,7 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
     onMessageStatus(handleMessageStatus);
     onMessageStatusBulk(handleMessageStatusBulk);
     onUserPresence(handlePresence);
+    onTyping(handleTyping);
 
     const socket = (window as any).socket;
     const handleReactionRemoved = (data: any) => {
@@ -295,6 +388,9 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
       offMessageStatus(handleMessageStatus);
       offMessageStatusBulk(handleMessageStatusBulk);
       offUserPresence(handlePresence);
+      offTyping(handleTyping);
+      if (typingClearRef.current) clearTimeout(typingClearRef.current);
+      setOtherTyping(false);
       if (socket) socket.off('reaction_removed', handleReactionRemoved);
     };
   }, [conversationId, currentUserId]);
@@ -303,7 +399,28 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
     scrollToBottom();
   }, [messages]);
 
+  // Keep the session cache in lock-step with the live thread (new messages,
+  // edits, reactions, tombstones) so reopening it is always instant *and*
+  // up to date. Optimistic temp messages are filtered out by setCachedMessages.
+  useEffect(() => {
+    if (!conversationId || messages.length === 0) return;
+    setCachedMessages(conversationId, messages);
+  }, [messages, conversationId]);
+
   const fetchConversation = async () => {
+    // Paint the header from the conversation-list cache first (no flicker on
+    // refresh / deep-link), then refresh from the network.
+    const cachedOther = getCachedOtherUser(conversationId);
+    if (cachedOther) {
+      setOtherUser({
+        id: cachedOther.id,
+        username: cachedOther.username,
+        name: cachedOther.name,
+        photoUrl: cachedOther.photoUrl,
+        isOnline: cachedOther.isOnline,
+        lastSeenAt: cachedOther.lastSeenAt,
+      });
+    }
     try {
       const token = localStorage.getItem("ps_token");
       const res = await fetch(
@@ -320,7 +437,11 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
             id: currentConv.otherUser.id,
             username: currentConv.otherUser.username,
             name: currentConv.otherUser.name,
-            photoUrl: currentConv.otherUser.photoUrl
+            photoUrl: currentConv.otherUser.photoUrl,
+            // Carry presence through — without these the header status line
+            // (online / last seen) stayed blank on page refresh.
+            isOnline: currentConv.otherUser.isOnline,
+            lastSeenAt: currentConv.otherUser.lastSeenAt,
           });
         }
       }
@@ -329,8 +450,8 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
     }
   };
 
-  const fetchMessages = async () => {
-    setLoading(true);
+  const fetchMessages = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const token = localStorage.getItem("ps_token");
       const res = await fetch(
@@ -346,6 +467,8 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
           return { ...msg, status: deriveStatus(msg) };
         });
         setMessages(withStatus);
+        // Warm the cache so the next open of this thread is instant.
+        setCachedMessages(conversationId, data);
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -456,6 +579,58 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
 
   const handleReply = (message: Message) => {
     setReplyTo(message);
+  };
+
+  // Optimistic reaction toggle — mirrors the backend's logic so the emoji
+  // appears the instant you tap it instead of after the HTTP+socket round
+  // trip. The socket events (message_reaction / reaction_removed) reconcile
+  // afterwards and are idempotent (they replace/remove by userId), so a
+  // double-apply is harmless.
+  const handleReactMessage = async (messageId: number, emoji: string) => {
+    const token = localStorage.getItem("ps_token");
+    let removed = false;
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const reactions = m.reactions || [];
+        const mine = reactions.find((r) => r.userId === currentUserId);
+        const others = reactions.filter((r) => r.userId !== currentUserId);
+        // Tapping the same emoji you already reacted with toggles it off.
+        if (mine && mine.emoji === emoji) {
+          removed = true;
+          return { ...m, reactions: others };
+        }
+        const optimistic = {
+          id: -Date.now(),
+          emoji,
+          userId: currentUserId!,
+          user: { id: currentUserId!, username: "" },
+        };
+        return { ...m, reactions: [...others, optimistic] };
+      })
+    );
+
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/messages/${messageId}/react`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      // No state work on success — the socket event is the source of truth and
+      // will overwrite our optimistic entry with the real one (correct id).
+    } catch (err) {
+      console.error("[chat] react error", err);
+      // Roll back the optimistic change on network failure.
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const reactions = m.reactions || [];
+          if (removed) return m; // can't cheaply restore; socket will resync
+          return { ...m, reactions: reactions.filter((r) => r.userId !== currentUserId) };
+        })
+      );
+    }
   };
 
   const handleSendMessage = async (content: string, mediaFiles?: File[]) => {
@@ -610,7 +785,10 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
     setConfirmAction(null);
   };
 
-  if (loading) {
+  // Only block on the loader for a genuinely cold thread (no cache, nothing
+  // painted yet). If we have cached messages the thread renders immediately
+  // and the background fetch reconciles silently — WhatsApp-style.
+  if (loading && messages.length === 0) {
     return (
       <div className="flex-1 min-h-0 flex items-center justify-center" style={{ color: "#8B9AAF" }}>
         Loading messages...
@@ -619,10 +797,10 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0" style={{ overflow: "hidden" }}>
+    <div className="flex flex-col flex-1 min-h-0" style={{ overflow: "hidden", minWidth: 0, height: "100%" }}>
       {/* Header */}
       <div
-        className="px-4 py-2.5 border-b flex items-center gap-3"
+        className="px-3 py-2 sm:px-4 sm:py-2.5 border-b flex items-center gap-2 sm:gap-3 flex-shrink-0"
         style={{ 
           borderColor: "rgba(232, 201, 106, 0.1)",
           backgroundColor: "#1A2332"
@@ -643,8 +821,13 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
         {otherUser && (
           <>
             <div
-              className="w-9 h-9 rounded-md flex items-center justify-center text-sm font-semibold overflow-hidden"
-              style={{ backgroundColor: "#1A2332", color: "#E8C96A" }}
+              onClick={handleViewProfile}
+              className="w-9 h-9 rounded-md flex items-center justify-center text-sm font-semibold overflow-hidden flex-shrink-0 cursor-pointer"
+              style={{
+                backgroundColor: "#1A2332",
+                color: "#E8C96A",
+                border: "1px solid #E8C96A",
+              }}
             >
               {otherUser.photoUrl ? (
                 <img
@@ -661,13 +844,23 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
               <h2 className="font-semibold text-sm" style={{ color: "#E8C96A" }}>
                 {otherUser.name}
               </h2>
-              <p className="text-xs" style={{ color: otherUser.isOnline ? "#10B981" : "#6B7280" }}>
-                {otherUser.isOnline
-                  ? "online"
-                  : otherUser.lastSeenAt
-                    ? `last seen ${formatLastSeen(otherUser.lastSeenAt)}`
-                    : `@${otherUser.username}`}
-              </p>
+              {/* Status line — priority: typing… > online > last seen. The
+                  @username line was removed (it leaked the login id). When we
+                  have no presence info at all the line is simply omitted
+                  rather than falling back to the username. */}
+              {otherTyping ? (
+                <p className="text-xs" style={{ color: "#10B981" }}>
+                  typing…
+                </p>
+              ) : otherUser.isOnline ? (
+                <p className="text-xs" style={{ color: "#10B981" }}>
+                  online
+                </p>
+              ) : otherUser.lastSeenAt ? (
+                <p className="text-xs" style={{ color: "#6B7280" }}>
+                  last seen {formatLastSeen(otherUser.lastSeenAt)}
+                </p>
+              ) : null}
             </div>
 
             <div className="relative" ref={menuRef}>
@@ -732,13 +925,14 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
       {/* Messages */}
       <div
         ref={messagesScrollRef}
-        className="flex-1 min-h-0 p-4"
+        className="flex-1 min-h-0 p-2 sm:p-4"
         style={{
           overflowY: "auto",
           overflowX: "hidden",
           display: "flex",
           flexDirection: "column",
-          gap: "12px"
+          gap: "8px",
+          WebkitOverflowScrolling: "touch",
         }}
       >
         {messages.length === 0 ? (
@@ -757,6 +951,8 @@ export default function ChatThread({ conversationId, otherUserData, onBack, isMo
               key={message.id}
               message={message}
               isOwn={message.senderId === currentUserId}
+              currentUserId={currentUserId}
+              onReact={handleReactMessage}
               onReply={handleReply}
               onEdit={handleEditMessage}
               onDeleteForMe={handleDeleteForMe}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { SearchIcon, ChatIcon } from "@/app/components/ui/Icons";
 import { onUserPresence, onTyping, offUserPresence, offTyping, onNewMessage, offNewMessage } from "@/app/services/socket";
 import NewChatModal from "./NewChatModal";
@@ -31,6 +31,35 @@ interface ConversationListProps {
   onSelect: (id: number, otherUser?: any) => void;
 }
 
+const CACHE_KEY = "chat:conversations";
+
+// Run before the browser paints so a remount of /messages shows the cached
+// list instead of a spinner (useEffect fires after paint → visible flash).
+// Falls back to useEffect during SSR where layout effects are no-ops.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+// Cache is "last known good" with no TTL — WhatsApp shows the previous list
+// instantly and revalidates in the background, never blocking on a spinner
+// once you've loaded it at least once this session.
+function getCached(): Conversation[] | null {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data } = JSON.parse(raw);
+    return data ?? null;
+  } catch { return null; }
+}
+
+function setCached(data: Conversation[]) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch { /* ignore */ }
+}
+
+function bustCache() {
+  try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+}
+
 export default function ConversationList({ selectedId, onSelect }: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
@@ -39,6 +68,39 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchUsers, setSearchUsers] = useState<any[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
+
+  // The currently-open conversation, mirrored into a ref so the socket
+  // handlers (registered once on mount) can read the latest value without
+  // re-subscribing.
+  const selectedIdRef = useRef<number | null>(selectedId);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+
+  // Opening a conversation reads it (ChatThread POSTs /read). Mirror that in
+  // the list immediately so the unread badge clears the moment you open the
+  // chat — WhatsApp behaviour — instead of lingering until the next refetch.
+  // Keyed on selectedId so it fires for row clicks *and* deep links.
+  useEffect(() => {
+    if (selectedId == null) return;
+    setConversations((prev) => {
+      if (!prev.some((c) => c.id === selectedId && c.unreadCount > 0)) return prev;
+      const next = prev.map((c) =>
+        c.id === selectedId ? { ...c, unreadCount: 0 } : c
+      );
+      setCached(next); // keep the session cache in sync so a remount stays cleared
+      return next;
+    });
+  }, [selectedId]);
+
+  // Paint the cached list synchronously on (re)mount so reopening /messages
+  // never flashes the loading spinner.
+  useIsoLayoutEffect(() => {
+    const cached = getCached();
+    if (cached) {
+      setConversations(cached);
+      setFilteredConversations(cached);
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchConversations();
@@ -78,13 +140,22 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
         const idx = prev.findIndex((c) => c.id === message.conversationId);
         if (idx === -1) {
           // Unknown conversation (newly created) — refetch the list.
-          fetchConversations();
+          fetchConversations(true);
           return prev;
         }
         const conv = prev[idx];
-        const isMine = message.senderId === (typeof window !== "undefined"
+        const myId = typeof window !== "undefined"
           ? parseInt(localStorage.getItem("ps_user_id") || "0")
-          : 0);
+          : 0;
+        const isMine = message.senderId === myId;
+        // A chat that's currently open is being read in real time, so it must
+        // never accrue an unread badge (ChatThread marks it read on arrival).
+        const isOpen = selectedIdRef.current === message.conversationId;
+        const unreadCount = isOpen
+          ? 0
+          : isMine
+          ? conv.unreadCount
+          : (conv.unreadCount || 0) + 1;
         const updated: Conversation = {
           ...conv,
           lastMessage: {
@@ -93,7 +164,7 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
             senderId: message.senderId,
             createdAt: message.createdAt,
           } as any,
-          unreadCount: isMine ? conv.unreadCount : (conv.unreadCount || 0) + 1,
+          unreadCount,
           updatedAt: message.createdAt,
         };
         const next = prev.filter((_, i) => i !== idx);
@@ -142,7 +213,12 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
     };
   }, [searchQuery, conversations, showNewChat]);
 
-  const fetchConversations = async () => {
+  // Always revalidates against the server in the background. We never gate the
+  // UI on this — the cached list (painted by the layout effect above) stays
+  // visible and is swapped for fresh data when it arrives. The spinner only
+  // shows on the very first load of the session (no cache yet).
+  const fetchConversations = async (bustFirst = false) => {
+    if (bustFirst) bustCache();
     try {
       const token = localStorage.getItem("ps_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/conversations`, {
@@ -150,8 +226,11 @@ export default function ConversationList({ selectedId, onSelect }: ConversationL
       });
       if (res.ok) {
         const data = await res.json();
+        setCached(data);
+        // The search effect ([searchQuery, conversations]) recomputes the
+        // filtered list, so we don't set it here — that would clobber an
+        // in-progress search when a background refresh lands.
         setConversations(data);
-        setFilteredConversations(data);
       }
     } catch (error) {
       console.error("Error fetching conversations:", error);

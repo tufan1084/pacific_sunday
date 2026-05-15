@@ -9,7 +9,9 @@ interface Props {
   side: "left" | "right";
 }
 
-const QUICK_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "🔥", "👏"];
+// WhatsApp shows exactly 6 quick reactions + a "+" to open more. Keeping it
+// to 6 means the horizontal pill is narrow enough to never need wrapping.
+const QUICK_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
 
 // Expanded set the user can scroll through after tapping "+". Curated to the
 // common-reaction subset of the full emoji picker so it stays compact.
@@ -58,21 +60,27 @@ export default function ReactionPicker({ isOpen, onClose, onPick, side }: Props)
   return (
     <div
       ref={ref}
-      className="absolute z-50 rounded-full shadow-xl"
+      className="absolute z-50 shadow-xl"
       style={{
         bottom: "100%",
         marginBottom: "6px",
         [side === "right" ? "right" : "left"]: 0,
         background: "#1A2332",
         border: "1px solid rgba(232, 201, 106, 0.25)",
-        padding: expanded ? "8px" : "6px 10px",
-        borderRadius: expanded ? "12px" : "999px",
-        // Cap the expanded grid so it doesn't overflow narrow chat panels.
-        maxWidth: "min(320px, calc(100vw - 24px))",
+        padding: expanded ? "8px" : "4px 8px",
+        // Full pill when collapsed (WhatsApp style), rounded-rect when the
+        // expanded grid is shown.
+        borderRadius: expanded ? "14px" : "999px",
+        // Explicit width = the exact content width. An absolutely-positioned
+        // flex container with no width shrinks to its minimum (one emoji per
+        // line) — that's what produced the vertical strip. max-content keeps
+        // the 6 emojis on one horizontal line.
+        width: expanded ? "min(304px, calc(100vw - 32px))" : "max-content",
+        maxWidth: "calc(100vw - 24px)",
       }}
     >
       {!expanded ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: "2px" }}>
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
@@ -122,7 +130,7 @@ export default function ReactionPicker({ isOpen, onClose, onPick, side }: Props)
             gap: "2px",
             maxHeight: "220px",
             overflowY: "auto",
-            width: "min(304px, calc(100vw - 40px))",
+            width: "100%",
           }}
         >
           {EXPANDED_EMOJIS.map((emoji, i) => (

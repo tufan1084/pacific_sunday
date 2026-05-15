@@ -16,6 +16,8 @@ interface MessageBubbleProps {
   onEdit?: (messageId: number, newContent: string) => void | Promise<void>;
   onDeleteForMe?: (messageId: number) => void | Promise<void>;
   onDeleteForEveryone?: (messageId: number) => void | Promise<void>;
+  onReact?: (messageId: number, emoji: string) => void | Promise<void>;
+  currentUserId?: number | null;
 }
 
 // Edit window matches the backend's enforcement so the menu doesn't tease an
@@ -70,7 +72,7 @@ function StatusIcon({ status, isOwn, errorMessage }: { status: MessageStatus; is
   );
 }
 
-export default function MessageBubble({ message, isOwn, onReply, onEdit, onDeleteForMe, onDeleteForEveryone }: MessageBubbleProps) {
+export default function MessageBubble({ message, isOwn, onReply, onEdit, onDeleteForMe, onDeleteForEveryone, onReact, currentUserId }: MessageBubbleProps) {
   const [hover, setHover] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
@@ -80,6 +82,8 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
 
   const isDeleted = !!message.deletedAt;
   const isEdited = !!message.editedAt;
+  const hasMedia = !isDeleted && Array.isArray(message.mediaUrls) && message.mediaUrls.length > 0;
+  const hasText = !!message.content;
   // Edit is allowed for own text messages within the window.
   const canEdit =
     isOwn &&
@@ -110,17 +114,11 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
   const formatTime = (dateStr: string) =>
     new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 
-  const handleReact = async (emoji: string) => {
-    try {
-      const token = localStorage.getItem("ps_token");
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/messages/${message.id}/react`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji }),
-      });
-    } catch (error) {
-      console.error("Error reacting to message:", error);
-    }
+  // Delegates to ChatThread so the reaction is applied optimistically (instant
+  // UI) and the socket event reconciles. The old version POSTed here and only
+  // updated after the round-trip — that's the lag the user reported.
+  const handleReact = (emoji: string) => {
+    onReact?.(message.id, emoji);
   };
 
   const handleCopy = () => {
@@ -141,8 +139,7 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
   // (own vs other) but muted styling and no actions.
   if (isDeleted) {
     return (
-      <div className={`flex gap-2 ${isOwn ? "flex-row-reverse" : "flex-row"} relative`}>
-        {!isOwn && <div className="w-7 h-7 flex-shrink-0" />}
+      <div className={`flex ${isOwn ? "flex-row-reverse" : "flex-row"} relative`}>
         <div className={`flex flex-col max-w-[70%] ${isOwn ? "items-end" : "items-start"}`}>
           <div
             className={`rounded-2xl px-3 py-2 ${isOwn ? "rounded-tr-sm" : "rounded-tl-sm"}`}
@@ -178,23 +175,7 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { setHover(false); }}
     >
-      {/* Avatar (only for other user) */}
-      {!isOwn && (
-        <div
-          className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden"
-          style={{ backgroundColor: "#1A2332", color: "#E8C96A" }}
-        >
-          {message.sender?.profile?.golfPassport?.photoUrl ? (
-            <img
-              src={message.sender.profile.golfPassport.photoUrl}
-              alt={message.sender.username}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            (message.sender?.profile?.name || message.sender?.username || "?").charAt(0).toUpperCase()
-          )}
-        </div>
-      )}
+
 
       {/* Message Content column. min-w-0 lets the flex chain honour the
           max-w cap — without it a single very long token (URL, run-on word)
@@ -225,9 +206,13 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
           </div>
         )}
 
-        {/* Bubble */}
+        {/* Bubble. WhatsApp media bubbles have almost no padding (a ~3px
+            inset of the bubble colour) and NO border around the image —
+            text-only bubbles keep the normal padding. */}
         <div
-          className={`rounded-2xl px-3 py-2 relative ${isOwn ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+          className={`relative ${isOwn ? "rounded-tr-sm" : "rounded-tl-sm"} ${
+            isEditing ? "rounded-2xl px-3 py-2" : hasMedia ? "rounded-xl p-[3px]" : "rounded-2xl px-3 py-2"
+          }`}
           style={{
             backgroundColor: isOwn ? "#E8C96A" : "#1A2332",
             color: isOwn ? "#01050D" : "#E8E8E8",
@@ -235,15 +220,32 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
             width: isEditing ? "100%" : undefined,
           }}
         >
-          {/* Media */}
-          {!isEditing && message.mediaUrls && message.mediaUrls.length > 0 && (
-            <div className="mb-2 space-y-2">
+          {/* Media. When there's a caption the image's BOTTOM corners are flat
+              so it merges into the caption block (WhatsApp behaviour) — only
+              the top corners are rounded. Media-only rounds all four. The
+              radius (~9px) ≈ bubble radius (12px) minus the 3px inset so the
+              curves line up. */}
+          {!isEditing && hasMedia && (
+            <div className={`space-y-1 overflow-hidden ${hasText ? "rounded-t-[9px]" : "rounded-[9px]"}`}>
               {message.mediaUrls.map((url: string, idx: number) => (
-                <div key={idx} className="rounded-lg overflow-hidden">
+                <div
+                  key={idx}
+                  className={`overflow-hidden ${hasText ? "rounded-t-[9px]" : "rounded-[9px]"}`}
+                >
                   {message.messageType === "IMAGE" || url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <img src={url} alt="Shared image" className="max-w-full h-auto rounded-lg" style={{ maxHeight: "280px" }} />
+                    <img
+                      src={url}
+                      alt="Shared image"
+                      className="block w-full h-auto"
+                      style={{ maxHeight: "320px", objectFit: "cover" }}
+                    />
                   ) : (
-                    <video src={url} controls className="max-w-full h-auto rounded-lg" style={{ maxHeight: "280px" }} />
+                    <video
+                      src={url}
+                      controls
+                      className="block w-full h-auto"
+                      style={{ maxHeight: "320px" }}
+                    />
                   )}
                 </div>
               ))}
@@ -296,7 +298,10 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
               </div>
             </div>
           ) : (
-            <>
+            // When media is present the bubble has only 3px padding, so the
+            // caption / time row needs its own inset. Text-only bubbles
+            // already get px-3 py-2 from the bubble itself.
+            <div className={hasMedia ? (hasText ? "px-2 pt-1 pb-0.5" : "px-1.5 pb-0.5") : ""}>
               {/* Text + inline time/status for short messages */}
               {message.content && (
                 <div className="flex items-end gap-2 min-w-0">
@@ -340,7 +345,7 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
                   <StatusIcon status={message.status || "sent"} isOwn={isOwn} errorMessage={message.errorMessage} />
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
@@ -362,8 +367,13 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
           <div
             className="absolute flex gap-1"
             style={{
-              top: "-6px",
-              [isOwn ? "left" : "right"]: "-46px",
+              // Anchor the triggers at the top corner *inside* the message
+              // column instead of -46px outside it. Outside placement pushed
+              // them off-screen on narrow / mobile chat panels (the
+              // "not responsive" report). Inside the column they always stay
+              // within the chat area, and the popups open inward from here.
+              top: "-14px",
+              [isOwn ? "right" : "left"]: 0,
               zIndex: 5,
             }}
           >

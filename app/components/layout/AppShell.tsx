@@ -119,20 +119,16 @@ export default function AppShell({ children }: AppShellProps) {
           showBack={!ROOT_PATHS.includes(pathname)}
         />
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-h-0">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
           <main
-            className="flex-1 min-w-0 main-content"
+            className="flex-1 min-w-0 min-h-0"
             style={{
-              padding: isMessagesPage ? "0" : undefined,
-              paddingBottom: isMessagesPage ? "0" : undefined,
+              padding: isMessagesPage ? "0" : "12px",
               backgroundColor: "#060D1F",
-              // iOS 13+ has momentum scrolling on by default for overflow:auto.
-              // The legacy `-webkit-overflow-scrolling: touch` is not only
-              // unnecessary now — it can freeze momentum on iOS 13+. Removed.
               overflow: isMessagesPage ? "hidden" : "auto",
-              height: isMessagesPage ? "calc(100dvh - 60px)" : "auto",
+              height: isMessagesPage ? "100%" : "auto",
             }}
           >
             {children}

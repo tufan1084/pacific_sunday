@@ -150,10 +150,9 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
 
   return (
     <div
-      className="border-t px-4 py-3"
+      className="border-t px-3 py-1.5 flex-shrink-0 relative"
       style={{
         borderColor: "rgba(232, 201, 106, 0.1)",
-        backgroundColor: "#1A2332",
         boxShadow: "0 -2px 10px rgba(0, 0, 0, 0.2)",
       }}
     >
@@ -164,6 +163,16 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
         onSend={handleSendFromModal}
         onAddMore={handleAddMoreImages}
         maxFiles={MAX_FILES}
+      />
+
+      {/* Emoji/GIF picker — mounted at the input-bar root (not inside the small
+          emoji button) so it can span the bar's full width and render as a
+          proper full-width sheet on mobile. */}
+      <EmojiGifPicker
+        isOpen={showEmojiPicker}
+        onClose={() => setShowEmojiPicker(false)}
+        onSelectEmoji={handleEmojiClick}
+        onSelectGif={handleGifSelect}
       />
 
       {/* Reply preview row — sits directly above the input pill when the user
@@ -208,15 +217,16 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
       <div className="flex items-end gap-2">
         {/* Pill containing emoji, textarea, image */}
         <div
-          className="flex-1 flex items-end gap-1 rounded-3xl px-2 py-1.5"
+          className="flex-1 flex items-center gap-1 rounded-3xl px-2 py-1"
           style={{
             backgroundColor: "#0F1629",
             border: "1px solid rgba(232, 201, 106, 0.15)",
             minHeight: "44px",
           }}
         >
-          {/* Emoji/GIF Picker Button (inside pill, left) */}
-          <div className="relative flex-shrink-0">
+          {/* Emoji/GIF Picker Button (inside pill, left) — the picker itself
+              is mounted at the input-bar root above so it can be full-width. */}
+          <div className="flex-shrink-0">
             <button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               className="p-1.5 rounded-full hover:bg-white/10 transition-all"
@@ -225,13 +235,6 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
             >
               <EmojiIcon size={22} />
             </button>
-
-            <EmojiGifPicker
-              isOpen={showEmojiPicker}
-              onClose={() => setShowEmojiPicker(false)}
-              onSelectEmoji={handleEmojiClick}
-              onSelectGif={handleGifSelect}
-            />
           </div>
 
           {/* Textarea */}

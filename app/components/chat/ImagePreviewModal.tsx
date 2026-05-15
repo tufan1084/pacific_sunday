@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CloseIcon, EmojiIcon } from "@/app/components/ui/Icons";
+import EmojiGifPicker from "./EmojiGifPicker";
 
 interface Props {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export default function ImagePreviewModal({
   const [currentIdx, setCurrentIdx] = useState(0);
   const [caption, setCaption] = useState(initialCaption);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const addMoreRef = useRef<HTMLInputElement>(null);
   const captionRef = useRef<HTMLInputElement>(null);
 
@@ -235,6 +237,9 @@ export default function ImagePreviewModal({
           alignItems: "center",
           gap: "8px",
           flexShrink: 0,
+          maxWidth: "600px",
+          width: "100%",
+          margin: "0 auto",
         }}
       >
         {/* Caption pill */}
@@ -248,9 +253,27 @@ export default function ImagePreviewModal({
             borderRadius: "999px",
             backgroundColor: "#1A2332",
             border: "1px solid rgba(232, 201, 106, 0.15)",
+            position: "relative",
           }}
         >
-          <EmojiIcon size={20} className="text-[#8B9AAF] flex-shrink-0" />
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              onClick={() => setShowEmojiPicker((v) => !v)}
+              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: showEmojiPicker ? "#E8C96A" : "#8B9AAF", padding: 0 }}
+              aria-label="Insert emoji"
+            >
+              <EmojiIcon size={20} />
+            </button>
+            <EmojiGifPicker
+              isOpen={showEmojiPicker}
+              onClose={() => setShowEmojiPicker(false)}
+              onSelectEmoji={(emoji) => {
+                setCaption((prev) => prev + emoji);
+                captionRef.current?.focus();
+              }}
+              onSelectGif={() => {}}
+            />
+          </div>
           <input
             ref={captionRef}
             value={caption}

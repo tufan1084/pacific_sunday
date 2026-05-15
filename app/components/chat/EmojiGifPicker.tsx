@@ -93,6 +93,10 @@ const GIF_SEARCH_DEBOUNCE_MS = 350;
 
 export default function EmojiGifPicker({ isOpen, onClose, onSelectEmoji, onSelectGif }: Props) {
   const [tab, setTab] = useState<Tab>("emoji");
+  // Drives the layout switch: floating popover on desktop, full-width
+  // bottom-anchored sheet on mobile (WhatsApp behaviour). 768px matches the
+  // isMobile breakpoint used in MessagesContent.
+  const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // GIF state
@@ -121,6 +125,15 @@ export default function EmojiGifPicker({ isOpen, onClose, onSelectEmoji, onSelec
       document.removeEventListener("keydown", onKey);
     };
   }, [isOpen, onClose]);
+
+  // Track viewport so the picker can switch between popover and bottom sheet
+  // without a hard refresh (device toolbar / rotation).
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Fetch GIFs (debounced search, or featured when query is empty).
   const fetchGifs = useCallback(async (q: string, append: boolean, cursor: string | null) => {
@@ -187,15 +200,42 @@ export default function EmojiGifPicker({ isOpen, onClose, onSelectEmoji, onSelec
   return (
     <div
       ref={containerRef}
-      className="absolute bottom-full left-0 mb-2 rounded-2xl shadow-2xl"
+      className="shadow-2xl"
       style={{
-        backgroundColor: "#0F1629",
-        border: "1px solid rgba(232, 201, 106, 0.2)",
-        width: "min(420px, calc(100vw - 24px))",
-        height: "360px",
+        position: "absolute",
+        // Anchored above the whole input bar (the parent is the input bar
+        // root, not the small emoji button) so it can span the full width.
+        bottom: "100%",
+        zIndex: 50,
         display: "flex",
         flexDirection: "column",
-        zIndex: 50,
+        backgroundColor: "#0F1629",
+        ...(isMobile
+          ? {
+              // Mobile: edge-to-edge sheet sitting flush on top of the input
+              // bar — exactly how WhatsApp shows it. No side gaps, only the
+              // top corners rounded.
+              left: 0,
+              right: 0,
+              width: "100%",
+              height: "min(58vh, 380px)",
+              maxHeight: "65vh",
+              borderTop: "1px solid rgba(232, 201, 106, 0.2)",
+              borderLeft: "1px solid rgba(232, 201, 106, 0.2)",
+              borderRight: "1px solid rgba(232, 201, 106, 0.2)",
+              borderRadius: "16px 16px 0 0",
+            }
+          : {
+              // Desktop: compact floating popover, left-aligned to the input
+              // bar, capped so it never exceeds the viewport.
+              left: 0,
+              width: "min(380px, calc(100vw - 16px))",
+              height: "min(360px, 60vh)",
+              maxHeight: "60vh",
+              marginBottom: "8px",
+              border: "1px solid rgba(232, 201, 106, 0.2)",
+              borderRadius: "16px",
+            }),
       }}
     >
       {/* Tab bar */}
