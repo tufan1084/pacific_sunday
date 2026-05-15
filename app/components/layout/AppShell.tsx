@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 import { RefreshProvider, useGlobalRefresh } from "@/app/context/RefreshContext";
@@ -50,6 +50,7 @@ const ROOT_PATHS = ["/", "/community", "/fantasy-golf", "/leaderboard", "/my-bag
 
 export default function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -96,6 +97,37 @@ export default function AppShell({ children }: AppShellProps) {
     if (user) prefetchCommonData();
   }, [user?.id]);
 
+  // Size the whole app shell to the *visual* viewport (the actually-visible
+  // area), tracked via the VisualViewport API. CSS `100dvh` deliberately
+  // ignores the on-screen keyboard, so the shell stayed full-height when the
+  // keyboard opened and the browser scrolled the chat header off the top.
+  // Pinning to visualViewport.height (+ following its offsetTop) makes the
+  // flex column compress instead — header stays put, input sits above the
+  // keyboard — on both Android and iOS. Falls back to the CSS 100dvh when the
+  // API is unavailable (old browsers / SSR).
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const el = shellRef.current;
+    if (!vv || !el) return;
+    const apply = () => {
+      el.style.height = `${vv.height}px`;
+      // Only translate when the browser actually shifted the layout viewport
+      // (iOS keyboard). A non-zero transform creates a containing block for
+      // position:fixed descendants (modals/pickers) — avoid that in the
+      // common offset===0 case by clearing the transform entirely.
+      el.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : "";
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    window.addEventListener("orientationchange", apply);
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+      window.removeEventListener("orientationchange", apply);
+    };
+  }, [pathname]);
+
   // NFC entry / auth pages render without sidebar & header — no loading gate
   if (isAuthRoute) {
     return <>{children}</>;
@@ -109,8 +141,11 @@ export default function AppShell({ children }: AppShellProps) {
   return (
     <RefreshProvider>
       <div
+        ref={shellRef}
         className="flex flex-col overflow-hidden"
         style={{
+          // Fallback only — the VisualViewport effect overrides this inline
+          // height (and adds a transform) on browsers that support the API.
           height: "100dvh",
         }}
       >

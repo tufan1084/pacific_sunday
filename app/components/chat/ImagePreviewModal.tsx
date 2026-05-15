@@ -31,6 +31,7 @@ export default function ImagePreviewModal({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const addMoreRef = useRef<HTMLInputElement>(null);
   const captionRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Build object URLs once per file set. Revoke on cleanup so we don't leak
   // memory across repeated open/close cycles.
@@ -63,6 +64,31 @@ export default function ImagePreviewModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
+  // This modal is its own position:fixed overlay, so the app-shell keyboard
+  // handling doesn't reach it — without this the soft keyboard would cover
+  // the caption input + send button. Size the modal to the *visible*
+  // viewport so it shrinks when the keyboard opens: the image area gives up
+  // space and the caption row stays just above the keyboard (WhatsApp).
+  useEffect(() => {
+    if (!isOpen) return;
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const el = rootRef.current;
+    if (!vv || !el) return;
+    const apply = () => {
+      el.style.height = `${vv.height}px`;
+      el.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : "";
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    window.addEventListener("orientationchange", apply);
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+      window.removeEventListener("orientationchange", apply);
+    };
+  }, [isOpen]);
+
   const handleAddMore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files || []);
     if (picked.length === 0) return;
@@ -83,10 +109,17 @@ export default function ImagePreviewModal({
 
   return (
     <div
+      ref={rootRef}
       onClick={onClose}
       style={{
         position: "fixed",
-        inset: 0,
+        // top/left/right (not inset:0) — no `bottom` so the JS-driven height
+        // (visible viewport) actually controls the box. Fallback 100dvh for
+        // browsers without the VisualViewport API.
+        top: 0,
+        left: 0,
+        right: 0,
+        height: "100dvh",
         // Solid near-black backdrop matches WhatsApp mobile's image-preview
         // backdrop — the chat panel disappears entirely behind it.
         backgroundColor: "#0B141A",
