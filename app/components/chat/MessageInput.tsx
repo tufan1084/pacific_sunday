@@ -72,6 +72,10 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
     setContent("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
+      // Keep the textarea focused so the mobile keyboard stays open after
+      // sending — WhatsApp behaviour. (Paired with preventDefault on the send
+      // button's mousedown so the tap never blurs the textarea to begin with.)
+      textareaRef.current.focus();
     }
   };
 
@@ -138,21 +142,37 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
   // Picking files opens the WhatsApp-style preview modal. The modal handles
   // caption + send; this component just opens it with the chosen files.
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // NOTE: do NOT clear e.target.value here. The preview modal materialises
+    // the blob (URL.createObjectURL) later in an effect; on mobile a
+    // camera-captured file is ephemeral and clearing the input before that
+    // happens drops the data — that's why "Take Photo" lost the picture.
+    // We reset the input *before* opening it instead (openCamera/openGallery).
     const files = Array.from(e.target.files || []);
-    // Reset whichever input fired so picking/taking the same image twice in a
-    // row still triggers onChange.
-    e.target.value = "";
     if (files.length === 0) return;
     setSelectedFiles(files.slice(0, MAX_FILES));
     setShowImagePreview(true);
     setShowSourceSheet(false);
   };
 
+  // Reset value before opening so re-selecting the same file still fires
+  // onChange, while never touching a freshly-captured file afterwards.
+  const openGallery = () => {
+    setShowSourceSheet(false);
+    const el = fileInputRef.current;
+    if (el) { el.value = ""; el.click(); }
+  };
+
+  const openCamera = () => {
+    setShowSourceSheet(false);
+    const el = cameraInputRef.current;
+    if (el) { el.value = ""; el.click(); }
+  };
+
   // Image icon tap: on mobile offer Camera vs Gallery (WhatsApp behaviour);
   // on desktop go straight to the file picker.
   const handleImageButtonClick = () => {
     if (isMobile) setShowSourceSheet(true);
-    else fileInputRef.current?.click();
+    else openGallery();
   };
 
   const handleAddMoreImages = (extra: File[]) => {
@@ -324,6 +344,9 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
             Image sends are confirmed inside the preview modal. */}
         <button
           onClick={handleSend}
+          // Don't let the tap move focus off the textarea — that blur is what
+          // closed the keyboard after every send. Click still fires.
+          onMouseDown={(e) => e.preventDefault()}
           disabled={!content.trim()}
           className="flex-shrink-0 rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 disabled:hover:scale-100 flex items-center justify-center"
           style={{
@@ -377,7 +400,7 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
           >
             <button
               type="button"
-              onClick={() => { setShowSourceSheet(false); cameraInputRef.current?.click(); }}
+              onClick={openCamera}
               className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl hover:bg-white/5 transition-colors"
               style={{ background: "none", border: "none", color: "#E8E8E8", fontSize: "15px", cursor: "pointer" }}
             >
@@ -390,7 +413,7 @@ export default function MessageInput({ onSend, conversationId, replyTo, onCancel
             <div style={{ height: "1px", backgroundColor: "rgba(232, 201, 106, 0.08)", margin: "0 16px" }} />
             <button
               type="button"
-              onClick={() => { setShowSourceSheet(false); fileInputRef.current?.click(); }}
+              onClick={openGallery}
               className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl hover:bg-white/5 transition-colors"
               style={{ background: "none", border: "none", color: "#E8E8E8", fontSize: "15px", cursor: "pointer" }}
             >

@@ -2,10 +2,35 @@ import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
 
+// Resolve the Socket.io endpoint.
+//
+// Why this matters: on Vercel the site is served over HTTPS. If
+// NEXT_PUBLIC_SOCKET_URL is unset the old code fell back to
+// "http://localhost:5000" (dead in production → no presence/typing/last
+// seen), and if it was set to a plain http:// host the browser blocked the
+// ws:// upgrade as mixed content. The REST API kept working because
+// NEXT_PUBLIC_API_URL is set and HTTPS — so we derive the socket origin from
+// that same URL. Same scheme (https → wss) and host as the API: no mixed
+// content, no localhost fallback. NEXT_PUBLIC_SOCKET_URL still wins if the
+// socket server lives on a different host.
+const resolveSocketUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) return process.env.NEXT_PUBLIC_SOCKET_URL;
+  const api = process.env.NEXT_PUBLIC_API_URL;
+  if (api) {
+    try {
+      // Strip the path (e.g. trailing "/api") — Socket.io wants the origin.
+      return new URL(api).origin;
+    } catch {
+      return api.replace(/\/api\/?$/, "");
+    }
+  }
+  return "http://localhost:5000";
+};
+
 export const initializeSocket = (userId: number) => {
   if (socket?.connected) return socket;
 
-  socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000", {
+  socket = io(resolveSocketUrl(), {
     transports: ["websocket", "polling"],
     reconnection: true,
     reconnectionDelay: 1000,

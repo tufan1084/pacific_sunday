@@ -228,7 +228,9 @@ export default function ImagePreviewModal({
         </div>
       )}
 
-      {/* Caption + send row */}
+      {/* Caption + send row. position:relative so the emoji/GIF picker
+          anchors to this full-width row (and spans the viewport on mobile)
+          instead of the ~20px emoji-button wrapper. */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -240,8 +242,19 @@ export default function ImagePreviewModal({
           maxWidth: "600px",
           width: "100%",
           margin: "0 auto",
+          position: "relative",
         }}
       >
+        <EmojiGifPicker
+          isOpen={showEmojiPicker}
+          onClose={() => setShowEmojiPicker(false)}
+          onSelectEmoji={(emoji) => {
+            setCaption((prev) => prev + emoji);
+            captionRef.current?.focus();
+          }}
+          onSelectGif={() => {}}
+        />
+
         {/* Caption pill */}
         <div
           style={{
@@ -256,7 +269,7 @@ export default function ImagePreviewModal({
             position: "relative",
           }}
         >
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ flexShrink: 0 }}>
             <button
               onClick={() => setShowEmojiPicker((v) => !v)}
               style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", color: showEmojiPicker ? "#E8C96A" : "#8B9AAF", padding: 0 }}
@@ -264,15 +277,6 @@ export default function ImagePreviewModal({
             >
               <EmojiIcon size={20} />
             </button>
-            <EmojiGifPicker
-              isOpen={showEmojiPicker}
-              onClose={() => setShowEmojiPicker(false)}
-              onSelectEmoji={(emoji) => {
-                setCaption((prev) => prev + emoji);
-                captionRef.current?.focus();
-              }}
-              onSelectGif={() => {}}
-            />
           </div>
           <input
             ref={captionRef}
@@ -291,7 +295,9 @@ export default function ImagePreviewModal({
               border: "none",
               outline: "none",
               color: "#E8E8E8",
-              fontSize: "14px",
+              // 16px — anything smaller makes iOS Safari zoom the whole
+              // viewport on focus, which is what broke this page on mobile.
+              fontSize: "16px",
               minWidth: 0,
             }}
           />

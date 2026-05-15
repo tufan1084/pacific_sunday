@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
+// Layout effect on the client (measure before paint → no flicker), plain
+// effect on the server where layout effects are no-ops.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 interface Props {
   isOpen: boolean;
@@ -47,6 +51,24 @@ export default function MessageActionMenu({
   onReply, onCopy, onEdit, onDeleteForMe, onDeleteForEveryone, side,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  // Vertical flip only (top ↔ bottom): open downward by default, but if the
+  // menu would be clipped below and there's more room above the trigger,
+  // open upward instead. Horizontal side is left untouched.
+  const [placeUp, setPlaceUp] = useState(false);
+
+  useIsoLayoutEffect(() => {
+    if (!isOpen) { setPlaceUp(false); return; }
+    const el = ref.current;
+    const anchor = el?.parentElement; // the relative wrapper around the trigger
+    if (!el || !anchor) return;
+    const a = anchor.getBoundingClientRect();
+    const menuH = el.offsetHeight;
+    const margin = 8;
+    const spaceBelow = window.innerHeight - a.bottom;
+    const spaceAbove = a.top;
+    // Flip up only when it doesn't fit below *and* there's more room above.
+    setPlaceUp(menuH + margin > spaceBelow && spaceAbove > spaceBelow);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -92,8 +114,9 @@ export default function MessageActionMenu({
       ref={ref}
       className="absolute z-50 rounded-lg shadow-xl"
       style={{
-        top: "100%",
-        marginTop: "4px",
+        ...(placeUp
+          ? { bottom: "100%", marginBottom: "4px" }
+          : { top: "100%", marginTop: "4px" }),
         [side === "right" ? "right" : "left"]: 0,
         minWidth: "180px",
         background: "#1A2332",

@@ -367,13 +367,16 @@ export default function MessageBubble({ message, isOwn, onReply, onEdit, onDelet
           <div
             className="absolute flex gap-1"
             style={{
-              // Anchor the triggers at the top corner *inside* the message
-              // column instead of -46px outside it. Outside placement pushed
-              // them off-screen on narrow / mobile chat panels (the
-              // "not responsive" report). Inside the column they always stay
-              // within the chat area, and the popups open inward from here.
-              top: "-14px",
-              [isOwn ? "right" : "left"]: 0,
+              // Sit beside the bubble, vertically centred, on the side that
+              // faces the chat centre (left of own messages, right of
+              // others) — not floating over the top corner. The message row
+              // is full-width, so this empty inner area is always within the
+              // hover surface and never clips off-screen the way the old
+              // outer-edge placement did.
+              top: "50%",
+              transform: "translateY(-50%)",
+              [isOwn ? "right" : "left"]: "100%",
+              [isOwn ? "marginRight" : "marginLeft"]: "8px",
               zIndex: 5,
             }}
           >

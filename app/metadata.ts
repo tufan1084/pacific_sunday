@@ -24,4 +24,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // Soft keyboard shrinks the layout viewport instead of scrolling the page,
+  // so the chat header stays put on mobile.
+  interactiveWidget: "resizes-content",
 };

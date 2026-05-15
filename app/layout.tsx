@@ -41,7 +41,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${poppins.variable} h-full`}>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        {/* interactive-widget=resizes-content: when the soft keyboard opens it
+            shrinks the layout viewport (so 100dvh / flex layouts compress)
+            instead of just scrolling the focused field into view. Without it
+            the chat Header + thread header get pushed off the top on mobile. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" type="image/png" href="/data/LOGO-PHOTO.png" />
         <link rel="shortcut icon" type="image/png" href="/data/LOGO-PHOTO.png" />

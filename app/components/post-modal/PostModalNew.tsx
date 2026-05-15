@@ -12,6 +12,7 @@ import SaveToCategorySheet from "../community/SaveToCategorySheet";
 import CommentItem from "../community/CommentItem";
 import { useToast } from "@/app/context/ToastContext";
 import EditableInput from "../ui/EditableInput";
+import GifPicker from "@/app/components/ui/GifPicker";
 
 interface PostModalNewProps {
   post: any;
@@ -53,6 +54,7 @@ export default function PostModalNew({ post: initialPost, isOpen, onClose }: Pos
   const [submitting, setSubmitting] = useState(false);
   const [commentMedia, setCommentMedia] = useState<File | null>(null);
   const [commentMediaPreview, setCommentMediaPreview] = useState<string | null>(null);
+  const [showCommentGif, setShowCommentGif] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -939,6 +941,15 @@ export default function PostModalNew({ post: initialPost, isOpen, onClose }: Pos
                 <input ref={commentCameraRef} type="file" accept="image/*" capture="environment" onChange={handleCommentMediaSelect} style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none", overflow: "hidden", clip: "rect(0,0,0,0)" }} />
                 <button
                   type="button"
+                  onClick={() => setShowCommentGif(true)}
+                  disabled={submitting}
+                  aria-label="Add GIF"
+                  style={{ background: 'none', border: '1px solid rgba(232,201,106,0.4)', borderRadius: '6px', cursor: 'pointer', color: '#E8C96A', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2px 6px', height: '22px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', flexShrink: 0, fontFamily: 'inherit' }}
+                >
+                  GIF
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowCommentSheet(true)}
                   disabled={submitting}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E8C96A', display: 'flex', alignItems: 'center', padding: '2px', flexShrink: 0 }}
@@ -959,6 +970,18 @@ export default function PostModalNew({ post: initialPost, isOpen, onClose }: Pos
           {/* Comment media sheet - rendered outside overflow:hidden container */}
         </div>
       </div>
+      {/* Outside the comment <form> so GifPicker's type-less buttons can't
+          submit the comment when tapped. */}
+      <GifPicker
+        isOpen={showCommentGif}
+        onClose={() => setShowCommentGif(false)}
+        onSelect={({ file }) => {
+          setCommentMedia(file);
+          setCommentMediaPreview(URL.createObjectURL(file));
+          setShowCommentGif(false);
+        }}
+      />
+
       {showCommentSheet && (
         <div onClick={() => setShowCommentSheet(false)} style={{ position: 'fixed', inset: 0, zIndex: 10000, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '420px', backgroundColor: '#13192A', borderRadius: '14px', padding: '8px', fontFamily: 'var(--font-poppins), sans-serif' }}>

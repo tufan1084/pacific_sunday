@@ -18,6 +18,7 @@ import ConfirmDialog from "../ui/ConfirmDialog";
 import SaveToCategorySheet from "./SaveToCategorySheet";
 import CommentItem from "./CommentItem";
 import EditableInput from "../ui/EditableInput";
+import GifPicker from "@/app/components/ui/GifPicker";
 
 
 interface PostCardProps {
@@ -85,6 +86,7 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
   const [commentMediaPreview, setCommentMediaPreview] = useState<string | null>(null);
 
   const [showCommentSheet, setShowCommentSheet] = useState(false);
+  const [showCommentGif, setShowCommentGif] = useState(false);
   const commentFileRef = useRef<HTMLInputElement>(null);
   const commentCameraRef = useRef<HTMLInputElement>(null);
 
@@ -1555,6 +1557,32 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
             </button>
           </div>
           <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowCommentGif(true); }}
+            disabled={submittingComment}
+            aria-label="Add GIF"
+            style={{
+              backgroundColor: "transparent",
+              color: "#E8C96A",
+              border: "1px solid rgba(232,201,106,0.4)",
+              borderRadius: "6px",
+              height: "28px",
+              padding: "0 8px",
+              fontSize: "11px",
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              cursor: submittingComment ? "not-allowed" : "pointer",
+              opacity: submittingComment ? 0.5 : 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              fontFamily: "inherit",
+            }}
+          >
+            GIF
+          </button>
+          <button
             onClick={handleAddComment}
             disabled={submittingComment || (!commentText.trim() && !commentMedia)}
             style={{
@@ -1591,6 +1619,16 @@ export default function PostCard({ post, onUpdate, onHidePost, onHideUser, isPub
           onSaved={handleSavedToCategory}
         />
       )}
+
+      <GifPicker
+        isOpen={showCommentGif}
+        onClose={() => setShowCommentGif(false)}
+        onSelect={({ file }) => {
+          setCommentMedia(file);
+          setCommentMediaPreview(URL.createObjectURL(file));
+          setShowCommentGif(false);
+        }}
+      />
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}
